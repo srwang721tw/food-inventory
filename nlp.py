@@ -196,5 +196,92 @@ def parse_food_text(text: str) -> dict:
     return result
 
 
+# ── Batch parser ─────────────────────────────────────────────────────────────
+
+def _split_items(text: str) -> list:
+    """Split a sentence that may describe several food items into segments."""
+
+    # 1. Explicit list separator 、
+    if '、' in text:
+        parts = [p.strip() for p in text.split('、') if p.strip()]
+        if len(parts) > 1:
+            return parts
+
+    # 2. Explicit multi connectors: 還有 / 另外 / 以及
+    m = re.search(r'\s*(?:還有|另外|以及)\s*', text)
+    if m:
+        left  = text[:m.start()].strip()
+        right = text[m.end():].strip()
+        if left and right:
+            return [left, right]
+
+    # 3. 和 / 跟 — only split when BOTH sides contain a qty+unit pattern
+    m = re.search(r'\s*[和跟]\s*', text)
+    if m:
+        left  = text[:m.start()].strip()
+        right = text[m.end():].strip()
+        qty_re = re.compile(rf'{_NUM_RE}\s*(?:{UNIT_RE})')
+        if qty_re.search(left) and qty_re.search(right):
+            return [left, right]
+
+    return [text]
+
+
+def parse_multiple_foods(text: str) -> list:
+    """Parse a sentence that may describe one or more food items.
+
+    Returns a list of item dicts (same format as parse_food_text).
+    Shares global purchase-date context across items when not individually stated.
+    """
+    today = date.today()
+    text = _fw2hw(text).strip()
+
+    # ── Extract global context ─────────────────────────────────
+    global_ctx: dict = {}
+
+    for pat, fn in [
+        (r'大前天',                     lambda _: today - timedelta(days=3)),
+        (r'前天',                       lambda _: today - timedelta(days=2)),
+        (r'昨天|昨日',                  lambda _: today - timedelta(days=1)),
+        (r'今天|今日',                  lambda _: today),
+        (rf'{_NUM_RE}\s*天前',          lambda m: today - timedelta(days=int(_to_float(m.group(1))))),
+        (rf'{_NUM_RE}\s*[週周星期]前',  lambda m: today - timedelta(weeks=int(_to_float(m.group(1))))),
+    ]:
+        if re.search(pat, text):
+            global_ctx['purchase_date'] = fn(re.search(pat, text)).isoformat()
+            break
+
+    if 'purchase_date' not in global_ctx and re.search(r'買了?|購買了?|採購了?', text):
+        global_ctx['purchase_date'] = today.isoformat()
+
+    for hint, kws in [
+        ('冰箱',   ['冰箱', '冷藏']),
+        ('冷凍庫', ['冷凍', '冷凍庫']),
+        ('乾貨櫃', ['乾貨', '儲藏', '常溫']),
+    ]:
+        if any(kw in text for kw in kws):
+            global_ctx['location_hint'] = hint
+            break
+
+    # ── Split & parse ──────────────────────────────────────────
+    segments = _split_items(text)
+    results = []
+
+    for seg in segments:
+        item = parse_food_text(seg)
+        if item['purchase_date'] is None and 'purchase_date' in global_ctx:
+            item['purchase_date'] = global_ctx['purchase_date']
+        if item['location_hint'] is None and 'location_hint' in global_ctx:
+            item['location_hint'] = global_ctx['location_hint']
+        if item['name'] and item['name'] != '未知食物':
+            results.append(item)
+
+    # Fallback: whole text as single item
+    if not results:
+        results = [parse_food_text(text)]
+
+    return results
+
+
 # Pre-warm jieba's dictionary on import (avoids slow first request)
 jieba.lcut('測試', cut_all=False)

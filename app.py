@@ -7,7 +7,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect as sqla_inspect, text
 
-from nlp import parse_food_text
+from nlp import parse_food_text, parse_multiple_foods
 
 load_dotenv()
 
@@ -74,29 +74,18 @@ class Item(db.Model):
 @app.route("/")
 def index():
     locations = Location.query.order_by(Location.created_at).all()
-    today = date.today()
-    cards = []
+    data = {"locations": []}
     for loc in locations:
-        its = loc.items
-        expired  = sum(1 for i in its if i.expiry_date and i.expiry_date < today)
-        expiring = sum(1 for i in its if i.expiry_date and
-                       0 <= (i.expiry_date - today).days <= 7)
-        cards.append({
-            "id":       loc.id,
-            "name":     loc.name,
-            "icon":     loc.icon,
-            "count":    len(its),
-            "expired":  expired,
-            "expiring": expiring,
-        })
-    total_items    = sum(c["count"]    for c in cards)
-    total_expired  = sum(c["expired"]  for c in cards)
-    total_expiring = sum(c["expiring"] for c in cards)
+        items = sorted(loc.items, key=lambda i: (
+            i.expiry_date is None,
+            i.expiry_date or date.max,
+            i.name,
+        ))
+        entry = loc.to_dict()
+        entry["items"] = [i.to_dict() for i in items]
+        data["locations"].append(entry)
     return render_template("index.html",
-                           cards=cards,
-                           total_items=total_items,
-                           total_expired=total_expired,
-                           total_expiring=total_expiring)
+                           data_json=json.dumps(data, ensure_ascii=False))
 
 
 @app.route("/location/<int:loc_id>")
@@ -158,9 +147,33 @@ def api_parse():
     if not text:
         return jsonify({"error": "請提供文字"}), 400
     try:
-        return jsonify(parse_food_text(text))
+        # Always return a list (may contain 1 or more items)
+        return jsonify(parse_multiple_foods(text))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/items/batch", methods=["POST"])
+def api_items_batch():
+    items_data = request.get_json()
+    if not isinstance(items_data, list):
+        return jsonify({"error": "Expected a list"}), 400
+    created = []
+    for data in items_data:
+        item = Item(
+            location_id   = data["location_id"],
+            name          = data["name"],
+            emoji         = data.get("emoji", "🍱"),
+            quantity      = float(data.get("quantity", 1)),
+            unit          = data.get("unit", "個"),
+            purchase_date = date.fromisoformat(data["purchase_date"]) if data.get("purchase_date") else None,
+            expiry_date   = date.fromisoformat(data["expiry_date"])   if data.get("expiry_date")   else None,
+            notes         = data.get("notes", ""),
+        )
+        db.session.add(item)
+        created.append(item)
+    db.session.commit()
+    return jsonify([i.to_dict() for i in created]), 201
 
 
 @app.route("/api/items", methods=["POST"])

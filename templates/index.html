@@ -1,171 +1,824 @@
-{% extends 'base.html' %}
-{% block title %}首頁{% endblock %}
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>家庭食物庫存</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:         #f2f2f7;
+      --card:       #ffffff;
+      --primary:    #30b0c7;
+      --primary-d:  #e8f7fa;
+      --danger:     #ff3b30;
+      --danger-d:   #fff0ef;
+      --warn:       #ff9500;
+      --warn-d:     #fff8ed;
+      --ok:         #34c759;
+      --ok-d:       #edfbf1;
+      --text:       #1c1c1e;
+      --text2:      #636366;
+      --text3:      #aeaeb2;
+      --border:     #e5e5ea;
+      --shadow:     0 2px 14px rgba(0,0,0,0.07);
+      --radius:     16px;
+      --rsm:        10px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Noto Sans TC', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 430px; margin: 0 auto; overflow-x: hidden; }
 
-{% block content %}
-<!-- ── Header ── -->
+    /* ── HEADER ── */
+    .header { background: rgba(255,255,255,0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 52px 18px 14px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .header h1 span { color: var(--primary); }
+
+    /* ── SUMMARY ── */
+    .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 14px 16px 8px; }
+    .sc { background: var(--card); border-radius: var(--rsm); padding: 11px; text-align: center; box-shadow: var(--shadow); }
+    .sc .n { font-size: 22px; font-weight: 700; }
+    .sc .l { font-size: 11px; color: var(--text2); margin-top: 1px; }
+    .sc.d .n { color: var(--danger); } .sc.w .n { color: var(--warn); } .sc.g .n { color: var(--ok); }
+
+    /* ── ACCORDION ── */
+    .locs { padding: 4px 16px 100px; display: flex; flex-direction: column; gap: 10px; }
+    .loc-acc { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .loc-head {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 14px 14px 16px; cursor: pointer; user-select: none;
+    }
+    .loc-head:active { background: #fafafa; }
+    .loc-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
+    .loc-info { flex: 1; min-width: 0; }
+    .loc-name { font-size: 15px; font-weight: 600; }
+    .loc-cnt  { font-size: 12px; color: var(--text3); margin-top: 1px; }
+    .loc-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+    .chevron { font-size: 20px; color: var(--text3); transition: transform 0.22s; line-height: 1; }
+    .chevron.open { transform: rotate(90deg); }
+
+    /* ── ITEM LIST INSIDE ACCORDION ── */
+    .loc-items { display: none; border-top: 1px solid var(--border); }
+    .loc-items.open { display: block; animation: fadeSlide 0.18s ease; }
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .loc-empty { text-align: center; padding: 24px 16px; font-size: 13px; color: var(--text3); }
+
+    .item-card {
+      display: flex; align-items: center; gap: 11px;
+      padding: 11px 14px 11px 20px;
+      border-bottom: 1px solid rgba(229,229,234,0.6);
+      cursor: pointer; transition: background 0.12s;
+      position: relative;
+    }
+    .item-card:last-child { border-bottom: none; }
+    .item-card:active { background: #f8f8f8; }
+    .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+    .item-card.sd::before { background: var(--danger); }
+    .item-card.sw::before { background: var(--warn); }
+    .item-card.sg::before { background: var(--ok); }
+    .item-emoji { font-size: 26px; line-height: 1; flex-shrink: 0; }
+    .item-info  { flex: 1; min-width: 0; }
+    .item-name  { font-size: 14px; font-weight: 600; }
+    .item-meta  { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+    /* ── BADGES ── */
+    .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .bd { background: var(--danger-d); color: var(--danger); }
+    .bw { background: var(--warn-d);   color: var(--warn); }
+    .bg { background: var(--ok-d);     color: var(--ok); }
+    .bn { background: var(--bg);       color: var(--text3); }
+
+    /* ── BUTTONS ── */
+    .add-btn {
+      width: 30px; height: 30px; flex-shrink: 0;
+      background: var(--primary); border: none; border-radius: 50%;
+      color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 3px 8px rgba(48,176,199,0.35);
+      transition: transform 0.1s;
+    }
+    .add-btn:active { transform: scale(0.88); }
+    .add-loc-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 13px; border-radius: var(--radius);
+      background: var(--card); border: 1.5px dashed var(--border);
+      color: var(--text2); font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .add-loc-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ── OVERLAY / SHEET ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: flex-end; }
+    .overlay.hidden { display: none; }
+    .sheet { background: var(--card); border-radius: 24px 24px 0 0; padding: 0 18px 40px; width: 100%; max-height: 92vh; overflow-y: auto; animation: su 0.26s cubic-bezier(0.32,0.72,0,1); scrollbar-width: none; }
+    .sheet::-webkit-scrollbar { display: none; }
+    .handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 13px auto 16px; }
+    .sheet h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
+    @keyframes su { from { transform: translateY(100%); } }
+
+    /* ── FORM ── */
+    .fg { margin-bottom: 13px; }
+    .fg label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
+    .fg input, .fg select, .fg textarea { width: 100%; padding: 10px 12px; border-radius: var(--rsm); border: 1.5px solid var(--border); font-size: 14px; font-family: inherit; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.14s; }
+    .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--primary); }
+    .fg textarea { resize: none; min-height: 62px; line-height: 1.5; }
+    .fg input::placeholder, .fg textarea::placeholder { color: var(--text3); }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+    .btn { flex: 1; padding: 13px; border: none; border-radius: var(--rsm); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.12s; }
+    .btn:active { opacity: 0.78; }
+    .btn-p { background: var(--primary); color: #fff; }
+    .btn-c { background: var(--bg); color: var(--text2); }
+    .btn-del { background: transparent; color: var(--danger); border: none; font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 0; font-family: inherit; }
+
+    /* ── VOICE BTN ── */
+    .voice-btn { width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: var(--primary-d); border: 2px solid var(--primary); color: var(--primary); font-size: 1.15rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.16s; }
+    .voice-btn:hover { background: var(--primary); color: #fff; }
+    .voice-btn.rec { background: var(--danger); border-color: var(--danger); color: #fff; animation: vp 1.2s ease-in-out infinite; }
+    @keyframes vp { 0%,100%{ box-shadow: 0 0 0 0 rgba(255,59,48,.4); } 50%{ box-shadow: 0 0 0 10px rgba(255,59,48,0); } }
+    .vrow { display: flex; gap: 10px; align-items: flex-start; }
+    .vstatus { font-size: 12px; color: var(--text3); min-height: 15px; margin-top: 4px; }
+
+    /* ── STEP LABEL ── */
+    .slabel { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .1em; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .slabel::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+    /* ── PARSE BTN ── */
+    .parse-btn { width: 100%; padding: 12px; border: none; border-radius: var(--rsm); font-size: 14px; font-weight: 600; background: var(--primary); color: #fff; cursor: pointer; font-family: inherit; margin-top: 10px; transition: opacity .15s; }
+    .parse-btn:disabled { opacity: .55; cursor: default; }
+
+    /* ── PREVIEW CARDS ── */
+    .preview-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+    .prev-card { background: var(--bg); border-radius: var(--rsm); overflow: hidden; border: 1px solid var(--border); }
+    .prev-summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; user-select: none; }
+    .prev-summary:active { opacity: .8; }
+    .prev-emoji { font-size: 24px; line-height: 1; }
+    .prev-info { flex: 1; min-width: 0; }
+    .prev-name { font-size: 14px; font-weight: 600; display: block; }
+    .prev-detail { font-size: 12px; color: var(--text2); display: block; margin-top: 1px; }
+    .prev-edit-icon { font-size: 13px; color: var(--text3); }
+    .prev-edit { padding: 10px 12px 12px; border-top: 1px solid var(--border); background: var(--card); }
+
+    /* ── EMOJI GRID ── */
+    .egrid { display: grid; grid-template-columns: repeat(8,1fr); gap: 4px; margin-bottom: 12px; }
+    .eopt { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 7px; cursor: pointer; transition: background .1s; }
+    .eopt:active, .eopt.sel { background: var(--primary-d); }
+
+    /* ── QTY ROW ── */
+    .qrow { display: flex; align-items: center; gap: 8px; }
+    .qbtn { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); font-size: 17px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .qval { font-size: 15px; font-weight: 600; min-width: 24px; text-align: center; }
+
+    /* ── SPINNER ── */
+    .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .55s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ── */
+    #toasts { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: 90%; max-width: 370px; }
+    .toast { background: rgba(30,30,32,.92); color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.2); animation: ti .18s ease; }
+    .toast.err { background: rgba(255,59,48,.92); }
+    @keyframes ti { from { transform: translateY(6px); opacity: 0; } }
+
+    /* ── EMPTY ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
+    .empty .ei { font-size: 50px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; color: var(--text3); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
 <div class="header">
   <div class="header-top">
     <h1>🏠 食物<span>庫存</span></h1>
-    <button class="add-btn" onclick="showSheet('addLocSheet')" title="新增存放地點">＋</button>
+    <button class="add-btn" onclick="showSheet('addLocSheet')" title="新增存放地點" style="width:32px;height:32px;font-size:20px">＋</button>
   </div>
 </div>
 
-<!-- ── Summary ── -->
-<div class="summary">
-  <div class="summary-card {% if total_expired %}danger{% else %}ok{% endif %}">
-    <div class="num">{{ total_expired }}</div><div class="label">已過期</div>
-  </div>
-  <div class="summary-card {% if total_expiring %}warn{% else %}ok{% endif %}">
-    <div class="num">{{ total_expiring }}</div><div class="label">即將到期</div>
-  </div>
-  <div class="summary-card ok">
-    <div class="num">{{ total_items }}</div><div class="label">總食物數</div>
-  </div>
-</div>
+<!-- Global summary -->
+<div class="summary" id="gSummary"></div>
 
-<!-- ── Location list ── -->
-<div class="loc-list">
-  {% if cards %}
-    {% for c in cards %}
-    <a href="/location/{{ c.id }}" class="loc-card">
-      <div class="loc-emoji">{{ c.icon }}</div>
-      <div class="loc-info">
-        <div class="loc-name">{{ c.name }}</div>
-        <div class="loc-meta">{{ c.count }} 項食物</div>
+<!-- Accordion list -->
+<div class="locs" id="locsList"></div>
+
+<div id="toasts"></div>
+
+<!-- ═══ 新增食物 Sheet ═══ -->
+<div class="overlay hidden" id="inputSheet">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2 id="inputTitle">新增食物</h2>
+
+    <!-- Step 1: voice/text -->
+    <div id="inputStep">
+      <div class="slabel">語音 / 文字輸入</div>
+      <div class="vrow">
+        <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎤</button>
+        <textarea id="voiceText" class="fg" style="flex:1;border:1.5px solid var(--border);border-radius:var(--rsm);padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);outline:none;resize:none;min-height:62px"
+          placeholder="說出或打入食物描述&#10;例：一瓶豆漿三天後到期、三包泡麵一個月後到期"></textarea>
       </div>
-      <div class="loc-right">
-        {% if c.expired %}
-          <span class="badge badge-danger">{{ c.expired }} 過期</span>
-        {% elif c.expiring %}
-          <span class="badge badge-warn">{{ c.expiring }} 快到期</span>
-        {% elif c.count %}
-          <span class="badge badge-ok">良好</span>
-        {% else %}
-          <span class="badge badge-none">空的</span>
-        {% endif %}
-        <span class="loc-arrow">›</span>
+      <p id="vstatus" class="vstatus"></p>
+      <button class="parse-btn" id="parseBtn" onclick="parseInput()">🔍 解析文字</button>
+    </div>
+
+    <!-- Step 2: preview + edit -->
+    <div id="previewStep" style="display:none">
+      <div class="slabel">找到 <span id="prevCount">0</span> 項食物，可手動修改</div>
+      <div class="preview-list" id="previewList"></div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn btn-c" onclick="backToInput()">← 重新輸入</button>
+        <button class="btn btn-p" id="confirmBtn" onclick="submitBatch()">加入庫存</button>
       </div>
-    </a>
-    {% endfor %}
-  {% else %}
-  <div class="empty">
-    <div class="empty-icon">🏠</div>
-    <h3>還沒有存放地點</h3>
-    <p>點右上角 ＋ 開始新增</p>
+    </div>
   </div>
-  {% endif %}
 </div>
 
-<!-- ── Add Location Sheet ── -->
+<!-- ═══ 編輯食物 Sheet ═══ -->
+<div class="overlay hidden" id="editSheet">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>編輯食物</h2>
+    <input type="hidden" id="eId">
+    <div class="fg"><label>選擇圖示</label><div class="egrid" id="eEmojiGrid"></div><input type="hidden" id="eEmoji"></div>
+    <div class="fg"><label>名稱 *</label><input type="text" id="eName"></div>
+    <div class="frow">
+      <div class="fg"><label>數量</label>
+        <div class="qrow"><button class="qbtn" onclick="eq(-1)">−</button><div class="qval" id="eQD">1</div><button class="qbtn" onclick="eq(1)">＋</button></div>
+      </div>
+      <div class="fg"><label>單位</label><input type="text" id="eUnit"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>購買日期</label><input type="date" id="ePurchase"></div>
+      <div class="fg"><label>到期日</label><input type="date" id="eExpiry"></div>
+    </div>
+    <div class="fg"><label>存放地點</label>
+      <select id="eLoc" style="border:1.5px solid var(--border);border-radius:var(--rsm);padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);width:100%;outline:none"></select>
+    </div>
+    <div class="fg"><label>備註</label><input type="text" id="eNotes"></div>
+    <div style="margin-top:4px"><button class="btn-del" onclick="delFromEdit()">🗑 刪除此食物</button></div>
+    <div class="btn-row">
+      <button class="btn btn-c" onclick="hideSheet('editSheet')">取消</button>
+      <button class="btn btn-p" onclick="submitEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 編輯地點 Sheet ═══ -->
+<div class="overlay hidden" id="editLocSheet">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>編輯存放地點</h2>
+    <input type="hidden" id="elId">
+    <div class="fg"><label>名稱</label><input type="text" id="elName"></div>
+    <div style="margin-top:4px"><button class="btn-del" onclick="delLoc()">🗑 刪除此地點（含所有食物）</button></div>
+    <div class="btn-row">
+      <button class="btn btn-c" onclick="hideSheet('editLocSheet')">取消</button>
+      <button class="btn btn-p" onclick="saveLoc()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 新增地點 Sheet ═══ -->
 <div class="overlay hidden" id="addLocSheet">
   <div class="sheet">
-    <div class="sheet-handle"></div>
+    <div class="handle"></div>
     <h2>新增存放地點</h2>
-
-    <div class="form-group">
-      <label>選擇圖示</label>
-      <div class="emoji-grid" id="locEmojiGrid"></div>
-      <input type="hidden" id="locIcon" value="🧊">
+    <div class="fg"><label>選擇圖示</label>
+      <div class="egrid" id="alEmojiGrid"></div>
+      <input type="hidden" id="alEmoji" value="🧊">
     </div>
-    <div class="form-group">
-      <label>名稱</label>
-      <input type="text" id="locName" placeholder="例：冰箱、零食抽屜、儲藏室"
-             onkeydown="if(event.key==='Enter') addLocation()">
+    <div class="fg"><label>名稱</label>
+      <input type="text" id="alName" placeholder="冰箱、零食抽屜、儲藏室…" onkeydown="if(event.key==='Enter')addLoc()">
     </div>
     <div class="btn-row">
-      <button class="btn btn-cancel" onclick="hideSheet('addLocSheet')">取消</button>
-      <button class="btn btn-primary" onclick="addLocation()">新增</button>
+      <button class="btn btn-c" onclick="hideSheet('addLocSheet')">取消</button>
+      <button class="btn btn-p" onclick="addLoc()">新增</button>
     </div>
   </div>
 </div>
 
-<style>
-  /* Header */
-  .header {
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    padding: 52px 20px 14px;
-    position: sticky; top: 0; z-index: 100;
-    border-bottom: 1px solid var(--border);
-  }
-  .header-top { display: flex; justify-content: space-between; align-items: center; }
-  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-  .header h1 span { color: var(--primary); }
-
-  /* Summary */
-  .summary {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px; padding: 14px 16px;
-  }
-  .summary-card {
-    background: var(--card); border-radius: var(--radius-sm);
-    padding: 12px; text-align: center; box-shadow: var(--shadow);
-  }
-  .summary-card .num { font-size: 24px; font-weight: 700; }
-  .summary-card .label { font-size: 11px; color: var(--text2); margin-top: 2px; }
-  .summary-card.danger .num { color: var(--danger); }
-  .summary-card.warn .num   { color: var(--warn); }
-  .summary-card.ok .num     { color: var(--ok); }
-
-  /* Location list */
-  .loc-list { padding: 0 16px 100px; display: flex; flex-direction: column; gap: 10px; }
-  .loc-card {
-    background: var(--card); border-radius: var(--radius);
-    padding: 14px 16px; display: flex; align-items: center; gap: 14px;
-    box-shadow: var(--shadow); text-decoration: none; color: var(--text);
-    transition: transform 0.12s;
-  }
-  .loc-card:active { transform: scale(0.98); }
-  .loc-emoji { font-size: 30px; line-height: 1; flex-shrink: 0; }
-  .loc-info { flex: 1; min-width: 0; }
-  .loc-name { font-size: 16px; font-weight: 600; }
-  .loc-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .loc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .loc-arrow { font-size: 20px; color: var(--text3); }
-
-  /* Empty */
-  .empty { text-align: center; padding: 70px 20px; color: var(--text2); }
-  .empty-icon { font-size: 54px; margin-bottom: 14px; }
-  .empty h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-  .empty p { font-size: 14px; color: var(--text3); }
-</style>
-
 <script>
-  const LOC_EMOJIS = ['🧊','❄️','🗄️','📦','🥬','🍳','🍷','🥫','🧺','🏺','🥩','🧁','🍱','🫙','🧂','☕'];
-  let selectedLocEmoji = '🧊';
+// ── Data ──────────────────────────────────────────────────────
+let DATA = {{ data_json|safe }};
+// Attach runtime state to each location
+DATA.locations.forEach(l => { l._open = false; });
 
-  (function buildLocGrid() {
-    const g = document.getElementById('locEmojiGrid');
-    g.innerHTML = LOC_EMOJIS.map(e =>
-      `<div class="emoji-opt${e===selectedLocEmoji?' selected':''}" onclick="pickLocEmoji('${e}',this)">${e}</div>`
-    ).join('');
-  })();
+let targetLocId  = null;   // which location the input sheet is for
+let editItemQty  = 1;
+let previewItems = [];     // array of parsed items pending confirm
 
-  function pickLocEmoji(e, el) {
-    selectedLocEmoji = e;
-    document.getElementById('locIcon').value = e;
-    document.querySelectorAll('#locEmojiGrid .emoji-opt').forEach(x => x.classList.remove('selected'));
-    el.classList.add('selected');
+// ── Emoji & helpers ───────────────────────────────────────────
+const EMOJIS = ['🥚','🥛','🧀','🥩','🥦','🥕','🍎','🍌','🍋','🫐','🍓','🍇','🧅','🧄','🫑','🌽','🥬','🍅','🥑','🫒','🐟','🍤','🥗','🌮','🥜','🍜','🍣','🥤','🧃','🍺','🧂','🫙','🥫','🧈','🍳','🫕','🍱','🧆','🫘'];
+const LOC_EMOJIS = ['🧊','❄️','🗄️','📦','🥬','🍳','🍷','🥫','🧺','🏺','🥩','🧁','☕','🫙'];
+
+const EMAP = [
+  [['牛奶','鮮奶','豆漿','米漿'],'🥛'],[['雞蛋','蛋'],'🥚'],[['豬','排骨','五花'],'🥩'],
+  [['雞','雞胸','雞腿','雞翅'],'🍗'],[['魚','鮭','鯖','鱸'],'🐟'],[['蝦','海鮮','蛤蜊'],'🦐'],
+  [['菜','菠菜','青菜','空心菜'],'🥬'],[['花椰','青花'],'🥦'],[['蘿蔔'],'🥕'],
+  [['番茄','蕃茄'],'🍅'],[['蘋果'],'🍎'],[['香蕉'],'🍌'],[['草莓'],'🍓'],[['葡萄'],'🍇'],
+  [['藍莓'],'🫐'],[['橘子','柳橙'],'🍊'],[['可樂','汽水','飲料','果汁'],'🥤'],
+  [['咖啡'],'☕'],[['麵','泡麵','拉麵'],'🍜'],[['飯','米飯'],'🍚'],[['起司'],'🧀'],
+  [['奶油'],'🧈'],[['餅乾'],'🍪'],[['豆腐'],'⬜'],
+];
+
+function autoEmoji(name) {
+  for (const [kws,e] of EMAP) if (kws.some(k => name.includes(k))) return e;
+  return '🍱';
+}
+
+function daysLeft(d) {
+  if (!d) return null;
+  const t = new Date(); t.setHours(0,0,0,0);
+  const e = new Date(d); e.setHours(0,0,0,0);
+  return Math.round((e - t) / 86400000);
+}
+
+function getStatus(item) {
+  const d = daysLeft(item.expiry_date);
+  if (d === null) return 'n';
+  if (d < 0)  return 'd';
+  if (d <= 3) return 'd';
+  if (d <= 7) return 'w';
+  return 'g';
+}
+
+function badgeText(item) {
+  const d = daysLeft(item.expiry_date);
+  if (d === null) return '無到期';
+  if (d < 0)  return `過期${Math.abs(d)}天`;
+  if (d === 0) return '今天到期！';
+  if (d === 1) return '明天到期';
+  return `還剩${d}天`;
+}
+
+function fmtDate(s) {
+  if (!s) return '';
+  return s.slice(5).replace('-', '/');  // "MM/DD"
+}
+
+// ── Global render ─────────────────────────────────────────────
+function render() {
+  renderSummary();
+  renderLocs();
+}
+
+function renderSummary() {
+  let exp = 0, warn = 0, total = 0;
+  for (const l of DATA.locations) {
+    for (const i of l.items) {
+      total++;
+      const d = daysLeft(i.expiry_date);
+      if (d === null) continue;
+      if (d < 0) exp++;
+      else if (d <= 7) warn++;
+    }
   }
+  document.getElementById('gSummary').innerHTML =
+    `<div class="sc ${exp?'d':'g'}"><div class="n">${exp}</div><div class="l">已過期</div></div>
+     <div class="sc ${warn?'w':'g'}"><div class="n">${warn}</div><div class="l">快到期</div></div>
+     <div class="sc g"><div class="n">${total}</div><div class="l">總食物數</div></div>`;
+}
 
-  async function addLocation() {
-    const name = document.getElementById('locName').value.trim();
-    if (!name) { toast('請輸入名稱', 'error'); return; }
-    const icon = document.getElementById('locIcon').value;
-
-    const resp = await fetch('/api/locations', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({name, icon}),
-    });
-    if (resp.ok) { toast('已新增「' + name + '」'); location.reload(); }
-    else toast('新增失敗', 'error');
+function renderLocs() {
+  const el = document.getElementById('locsList');
+  if (!DATA.locations.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點，點右上角 ＋ 新增</p></div>`;
+    return;
   }
+  el.innerHTML = DATA.locations.map(locHTML).join('') +
+    `<button class="add-loc-btn" onclick="showSheet('addLocSheet')">＋ 新增存放地點</button>`;
+}
 
-  // Reset sheet on open
-  document.querySelector('[onclick="showSheet(\'addLocSheet\')"]').addEventListener('click', () => {
-    document.getElementById('locName').value = '';
-    setTimeout(() => document.getElementById('locName').focus(), 100);
+function locHTML(loc) {
+  const expired  = loc.items.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d < 0; }).length;
+  const expiring = loc.items.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d >= 0 && d <= 7; }).length;
+
+  const badges = [
+    expired  ? `<span class="badge bd">${expired}過期</span>`  : '',
+    expiring ? `<span class="badge bw">${expiring}快到期</span>` : '',
+  ].join('');
+
+  const itemsHTML = loc.items.length === 0
+    ? `<div class="loc-empty">還沒有食物，點 ＋ 新增</div>`
+    : loc.items.map(itemHTML).join('');
+
+  return `
+  <div class="loc-acc" id="la-${loc.id}">
+    <div class="loc-head" onclick="toggleLoc(${loc.id})">
+      <div class="loc-icon">${loc.icon}</div>
+      <div class="loc-info">
+        <div class="loc-name">${loc.name}</div>
+        <div class="loc-cnt">${loc.items.length} 項食物</div>
+      </div>
+      <div class="loc-right">
+        ${badges}
+        <button class="add-btn" onclick="openInput(${loc.id},event)" title="新增食物">＋</button>
+        <button class="add-btn" style="background:transparent;border:none;box-shadow:none;color:var(--text3);font-size:13px;padding:0" onclick="openEditLoc(${loc.id},event)" title="編輯地點">✏️</button>
+        <span class="chevron ${loc._open?'open':''}">›</span>
+      </div>
+    </div>
+    <div class="loc-items ${loc._open?'open':''}">${itemsHTML}</div>
+  </div>`;
+}
+
+function itemHTML(item) {
+  const st = getStatus(item);
+  const badge = `<span class="badge b${st}">${badgeText(item)}</span>`;
+  const qty = item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1);
+  return `
+  <div class="item-card s${st}" onclick="openEditItem(${item.id})">
+    <div class="item-emoji">${item.emoji||'🍱'}</div>
+    <div class="item-info">
+      <div class="item-name">${item.name}
+        <span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span>
+      </div>
+      <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
+    </div>
+    ${badge}
+  </div>`;
+}
+
+// ── Accordion toggle ──────────────────────────────────────────
+function toggleLoc(id) {
+  const loc = DATA.locations.find(l => l.id === id);
+  if (loc) loc._open = !loc._open;
+  renderLocs();
+}
+
+// ── Overlay helpers ───────────────────────────────────────────
+function showSheet(id) {
+  document.getElementById(id).classList.remove('hidden');
+  document.getElementById(id).querySelector('.sheet').scrollTop = 0;
+}
+function hideSheet(id) { document.getElementById(id).classList.add('hidden'); }
+
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('overlay')) e.target.classList.add('hidden');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.overlay:not(.hidden)').forEach(o => o.classList.add('hidden'));
+});
+
+// ── Toast ─────────────────────────────────────────────────────
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type?' '+type:'');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+// ── Emoji pickers ─────────────────────────────────────────────
+function buildEGrid(gridId, hiddenId, list, selected) {
+  document.getElementById(gridId).innerHTML = list.map(e =>
+    `<div class="eopt${e===selected?' sel':''}" onclick="pickE('${gridId}','${hiddenId}','${e}',this)">${e}</div>`
+  ).join('');
+  document.getElementById(hiddenId).value = selected;
+}
+function pickE(gid, hid, e, el) {
+  document.getElementById(hid).value = e;
+  document.querySelectorAll('#'+gid+' .eopt').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function setESelected(gid, hid, e) {
+  document.getElementById(hid).value = e;
+  document.querySelectorAll('#'+gid+' .eopt').forEach(x=>x.classList.toggle('sel', x.textContent.trim()===e));
+}
+
+// ── Add Location ──────────────────────────────────────────────
+(function initAddLocEmoji() {
+  buildEGrid('alEmojiGrid','alEmoji', LOC_EMOJIS, '🧊');
+})();
+
+document.querySelector('[onclick="showSheet(\'addLocSheet\')"]').addEventListener('click', () => {
+  document.getElementById('alName').value = '';
+  setTimeout(() => document.getElementById('alName').focus(), 80);
+});
+
+async function addLoc() {
+  const name = document.getElementById('alName').value.trim();
+  if (!name) { toast('請輸入名稱','err'); return; }
+  const icon = document.getElementById('alEmoji').value;
+  const r = await fetch('/api/locations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,icon})});
+  if (r.ok) {
+    const loc = await r.json();
+    loc.items = []; loc._open = false;
+    DATA.locations.push(loc);
+    hideSheet('addLocSheet');
+    render();
+    toast('已新增「'+name+'」');
+  } else toast('新增失敗','err');
+}
+
+// ── Edit/Delete Location ──────────────────────────────────────
+function openEditLoc(id, e) {
+  e.stopPropagation();
+  const loc = DATA.locations.find(l => l.id === id);
+  document.getElementById('elId').value = id;
+  document.getElementById('elName').value = loc.name;
+  showSheet('editLocSheet');
+}
+async function saveLoc() {
+  const id   = parseInt(document.getElementById('elId').value);
+  const name = document.getElementById('elName').value.trim();
+  if (!name) { toast('名稱不能為空','err'); return; }
+  const r = await fetch(`/api/locations/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if (r.ok) {
+    const loc = DATA.locations.find(l=>l.id===id);
+    if (loc) loc.name = name;
+    hideSheet('editLocSheet'); render(); toast('已儲存');
+  } else toast('儲存失敗','err');
+}
+async function delLoc() {
+  const id = parseInt(document.getElementById('elId').value);
+  const loc = DATA.locations.find(l=>l.id===id);
+  if (!confirm(`確定刪除「${loc?.name}」？底下 ${loc?.items.length} 項食物也會刪除。`)) return;
+  const r = await fetch(`/api/locations/${id}`,{method:'DELETE'});
+  if (r.ok) {
+    DATA.locations = DATA.locations.filter(l=>l.id!==id);
+    hideSheet('editLocSheet'); render(); toast('已刪除');
+  } else toast('刪除失敗','err');
+}
+
+// ── Input sheet ───────────────────────────────────────────────
+function openInput(locId, e) {
+  e.stopPropagation();
+  targetLocId = locId;
+  const loc = DATA.locations.find(l=>l.id===locId);
+  document.getElementById('inputTitle').textContent = `加入 ${loc.icon} ${loc.name}`;
+  document.getElementById('voiceText').value = '';
+  document.getElementById('vstatus').textContent = '';
+  document.getElementById('inputStep').style.display = '';
+  document.getElementById('previewStep').style.display = 'none';
+  previewItems = [];
+  showSheet('inputSheet');
+}
+
+function backToInput() {
+  document.getElementById('inputStep').style.display = '';
+  document.getElementById('previewStep').style.display = 'none';
+}
+
+// ── Voice ─────────────────────────────────────────────────────
+let recog = null, isRec = false;
+const vBtn = document.getElementById('voiceBtn');
+
+function toggleVoice() { isRec ? stopVoice() : startVoice(); }
+function startVoice() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('請用 Chrome 或 Edge','err'); return; }
+  recog = new SR(); recog.lang = 'zh-TW'; recog.continuous = false; recog.interimResults = true;
+  recog.onstart  = () => { isRec=true; vBtn.classList.add('rec'); vBtn.textContent='⏹'; setVS('🔴 錄音中⋯'); };
+  recog.onresult = e => { let t=''; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('voiceText').value=t; };
+  recog.onend    = () => { isRec=false; vBtn.classList.remove('rec'); vBtn.textContent='🎤'; setVS('✅ 完成，按「解析文字」繼續'); };
+  recog.onerror  = e => { isRec=false; vBtn.classList.remove('rec'); vBtn.textContent='🎤'; setVS('⚠️ '+e.error); };
+  recog.start();
+}
+function stopVoice() { recog&&recog.stop(); }
+function setVS(m) { document.getElementById('vstatus').textContent = m; }
+
+// ── Parse ─────────────────────────────────────────────────────
+async function parseInput() {
+  const text = document.getElementById('voiceText').value.trim();
+  if (!text) { toast('請先輸入描述','err'); return; }
+  const btn = document.getElementById('parseBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 解析中⋯';
+  try {
+    const r = await fetch('/api/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error||'失敗');
+
+    // data is a list
+    previewItems = data.map((item,idx) => ({
+      ...item,
+      _id:     'p'+idx,
+      _open:   false,
+      emoji:   autoEmoji(item.name),
+      _qty:    item.quantity || 1,
+    }));
+
+    renderPreview();
+    document.getElementById('inputStep').style.display = 'none';
+    document.getElementById('previewStep').style.display = '';
+    toast(`解析到 ${previewItems.length} 項，請確認`);
+  } catch(e) {
+    toast('解析失敗：'+e.message,'err');
+  } finally {
+    btn.disabled = false; btn.innerHTML = '🔍 解析文字';
+  }
+}
+
+// ── Preview ───────────────────────────────────────────────────
+function renderPreview() {
+  document.getElementById('prevCount').textContent = previewItems.length;
+  document.getElementById('previewList').innerHTML = previewItems.map(prevCardHTML).join('');
+}
+
+function prevCardHTML(item) {
+  const dL = daysLeft(item.expiry_date);
+  const exText = item.expiry_date
+    ? (dL < 0 ? `已過期${Math.abs(dL)}天` : `${dL}天後到期`)
+    : '未設到期';
+  const qtyDisplay = (item._qty||1) % 1 === 0 ? (item._qty||1) : (item._qty||1).toFixed(1);
+  return `
+  <div class="prev-card" id="pc-${item._id}">
+    <div class="prev-summary" onclick="togglePrevEdit('${item._id}')">
+      <span class="prev-emoji">${item.emoji}</span>
+      <div class="prev-info">
+        <span class="prev-name">${item.name}</span>
+        <span class="prev-detail">${qtyDisplay}${item.unit||'個'} · ${exText}</span>
+      </div>
+      <span class="prev-edit-icon">${item._open?'▲':'✏️'}</span>
+    </div>
+    ${item._open ? prevEditHTML(item) : ''}
+  </div>`;
+}
+
+function prevEditHTML(item) {
+  const qD = (item._qty||1) % 1 === 0 ? (item._qty||1) : (item._qty||1).toFixed(1);
+  return `
+  <div class="prev-edit">
+    <div class="egrid" id="peg-${item._id}">${EMOJIS.map(e=>`<div class="eopt${e===item.emoji?' sel':''}" onclick="pPickEmoji('${item._id}','${e}',this)">${e}</div>`).join('')}</div>
+    <div class="fg"><label>名稱</label><input value="${escHtml(item.name)}" oninput="pUpdate('${item._id}','name',this.value)"></div>
+    <div class="frow">
+      <div class="fg"><label>數量</label>
+        <div class="qrow">
+          <button class="qbtn" onclick="pQty('${item._id}',-0.1)">−</button>
+          <div class="qval" id="pqd-${item._id}">${qD}</div>
+          <button class="qbtn" onclick="pQty('${item._id}',0.1)">＋</button>
+        </div>
+      </div>
+      <div class="fg"><label>單位</label><input value="${escHtml(item.unit||'個')}" oninput="pUpdate('${item._id}','unit',this.value)"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>購買日期</label><input type="date" value="${item.purchase_date||''}" onchange="pUpdate('${item._id}','purchase_date',this.value)"></div>
+      <div class="fg"><label>到期日</label><input type="date" value="${item.expiry_date||''}" onchange="pUpdate('${item._id}','expiry_date',this.value)"></div>
+    </div>
+    <button class="btn-del" onclick="pRemove('${item._id}')">🗑 移除此項</button>
+  </div>`;
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function togglePrevEdit(id) {
+  const item = previewItems.find(i=>i._id===id);
+  if (item) { item._open = !item._open; renderPreview(); }
+}
+function pUpdate(id, field, val) {
+  const item = previewItems.find(i=>i._id===id);
+  if (!item) return;
+  item[field] = val;
+  // Live-update summary line
+  const dL = daysLeft(item.expiry_date);
+  const exT = item.expiry_date ? (dL<0?`已過期${Math.abs(dL)}天`:`${dL}天後到期`) : '未設到期';
+  const qD = (item._qty||1)%1===0?(item._qty||1):(item._qty||1).toFixed(1);
+  const det = document.querySelector(`#pc-${id} .prev-detail`);
+  const nm  = document.querySelector(`#pc-${id} .prev-name`);
+  if (det) det.textContent = `${qD}${item.unit||'個'} · ${exT}`;
+  if (nm)  nm.textContent  = item.name;
+}
+function pQty(id, delta) {
+  const item = previewItems.find(i=>i._id===id);
+  if (!item) return;
+  item._qty = Math.max(0.1, Math.round(((item._qty||1) + delta) * 10) / 10);
+  const el = document.getElementById('pqd-'+id);
+  if (el) el.textContent = item._qty%1===0?item._qty:item._qty.toFixed(1);
+  item.quantity = item._qty;
+  pUpdate(id, 'unit', item.unit); // trigger detail refresh
+}
+function pPickEmoji(id, e, el) {
+  const item = previewItems.find(i=>i._id===id);
+  if (!item) return;
+  item.emoji = e;
+  document.querySelectorAll(`#peg-${id} .eopt`).forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  const em = document.querySelector(`#pc-${id} .prev-emoji`);
+  if (em) em.textContent = e;
+}
+function pRemove(id) {
+  previewItems = previewItems.filter(i=>i._id!==id);
+  if (previewItems.length === 0) { backToInput(); return; }
+  renderPreview();
+}
+
+// ── Batch save ────────────────────────────────────────────────
+async function submitBatch() {
+  if (!targetLocId || !previewItems.length) return;
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 儲存⋯';
+
+  const payload = previewItems.map(i => ({
+    location_id:   targetLocId,
+    name:          i.name,
+    emoji:         i.emoji,
+    quantity:      i._qty || i.quantity || 1,
+    unit:          i.unit || '個',
+    purchase_date: i.purchase_date || null,
+    expiry_date:   i.expiry_date   || null,
+    notes:         i.notes || '',
+  }));
+
+  try {
+    const r = await fetch('/api/items/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (!r.ok) throw new Error();
+    const saved = await r.json();
+    const loc = DATA.locations.find(l=>l.id===targetLocId);
+    if (loc) {
+      loc.items.push(...saved);
+      loc.items = sortItems(loc.items);
+      loc._open = true;
+    }
+    hideSheet('inputSheet');
+    previewItems = [];
+    render();
+    toast(`✅ 已新增 ${saved.length} 項食物`);
+  } catch { toast('儲存失敗','err'); }
+  finally { btn.disabled=false; btn.innerHTML='加入庫存'; }
+}
+
+function sortItems(items) {
+  const maxDate = '9999-12-31';
+  return items.sort((a,b)=>{
+    const da = a.expiry_date||maxDate, db = b.expiry_date||maxDate;
+    if (!a.expiry_date && !b.expiry_date) return a.name.localeCompare(b.name);
+    if (!a.expiry_date) return 1;
+    if (!b.expiry_date) return -1;
+    return da < db ? -1 : 1;
   });
+}
+
+// ── Edit existing item ────────────────────────────────────────
+function openEditItem(id) {
+  let item = null;
+  for (const loc of DATA.locations) {
+    item = loc.items.find(i=>i.id===id);
+    if (item) break;
+  }
+  if (!item) return;
+
+  document.getElementById('eId').value       = id;
+  document.getElementById('eName').value      = item.name;
+  editItemQty = item.quantity;
+  document.getElementById('eQD').textContent = editItemQty%1===0?editItemQty:editItemQty.toFixed(1);
+  document.getElementById('eUnit').value      = item.unit;
+  document.getElementById('ePurchase').value  = item.purchase_date||'';
+  document.getElementById('eExpiry').value    = item.expiry_date||'';
+  document.getElementById('eNotes').value     = item.notes||'';
+
+  // Location select
+  document.getElementById('eLoc').innerHTML = DATA.locations.map(l=>
+    `<option value="${l.id}"${l.id===item.location_id?' selected':''}>${l.icon} ${l.name}</option>`
+  ).join('');
+
+  buildEGrid('eEmojiGrid','eEmoji', EMOJIS, item.emoji||'🍱');
+  showSheet('editSheet');
+}
+
+function eq(d) {
+  editItemQty = Math.max(0.1, Math.round((editItemQty + d) * 10) / 10);
+  document.getElementById('eQD').textContent = editItemQty%1===0?editItemQty:editItemQty.toFixed(1);
+}
+
+async function submitEdit() {
+  const id   = parseInt(document.getElementById('eId').value);
+  const name = document.getElementById('eName').value.trim();
+  if (!name) { toast('名稱不能為空','err'); return; }
+  const newLocId = parseInt(document.getElementById('eLoc').value);
+
+  const r = await fetch(`/api/items/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    name,
+    emoji:         document.getElementById('eEmoji').value,
+    quantity:      editItemQty,
+    unit:          document.getElementById('eUnit').value,
+    location_id:   newLocId,
+    purchase_date: document.getElementById('ePurchase').value||null,
+    expiry_date:   document.getElementById('eExpiry').value||null,
+    notes:         document.getElementById('eNotes').value,
+  })});
+  if (r.ok) {
+    const updated = await r.json();
+    // Remove from old location
+    for (const loc of DATA.locations) loc.items = loc.items.filter(i=>i.id!==id);
+    // Add to new (or same) location
+    const tLoc = DATA.locations.find(l=>l.id===newLocId);
+    if (tLoc) { tLoc.items.push(updated); tLoc.items = sortItems(tLoc.items); }
+    hideSheet('editSheet'); render(); toast('已儲存');
+  } else toast('儲存失敗','err');
+}
+
+async function delFromEdit() {
+  const id   = parseInt(document.getElementById('eId').value);
+  const name = document.getElementById('eName').value;
+  if (!confirm(`確定刪除「${name}」嗎？`)) return;
+  const r = await fetch(`/api/items/${id}`,{method:'DELETE'});
+  if (r.ok) {
+    for (const loc of DATA.locations) loc.items = loc.items.filter(i=>i.id!==id);
+    hideSheet('editSheet'); render(); toast('已刪除「'+name+'」');
+  } else toast('刪除失敗','err');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+render();
 </script>
-{% endblock %}
+</body>
+</html>
