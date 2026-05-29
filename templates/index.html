@@ -386,7 +386,7 @@ function renderLocs() {
     return;
   }
   el.innerHTML = DATA.locations.map(locHTML).join('') +
-    `<button class="add-loc-btn" onclick="showSheet('addLocSheet')">＋ 新增存放地點</button>`;
+    `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
 }
 
 function locHTML(loc) {
@@ -490,10 +490,12 @@ function setESelected(gid, hid, e) {
   buildEGrid('alEmojiGrid','alEmoji', LOC_EMOJIS, '🧊');
 })();
 
-document.querySelector('[onclick="showSheet(\'addLocSheet\')"]').addEventListener('click', () => {
+// Clear + focus name field whenever the addLocSheet is opened
+function openAddLoc() {
+  showSheet('addLocSheet');
   document.getElementById('alName').value = '';
   setTimeout(() => document.getElementById('alName').focus(), 80);
-});
+}
 
 async function addLoc() {
   const name = document.getElementById('alName').value.trim();
