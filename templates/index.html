@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>家庭食物庫存</title>
+  <title>王氏夫妻家庭共享食物庫存系統</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -190,8 +190,7 @@
 <!-- Header -->
 <div class="header">
   <div class="header-top">
-    <h1>🏠 食物<span>庫存</span></h1>
-    <button class="add-btn" onclick="showSheet('addLocSheet')" title="新增存放地點" style="width:32px;height:32px;font-size:20px">＋</button>
+    <h1>🏠 王氏夫妻<span>食物庫存</span></h1>
   </div>
 </div>
 
@@ -382,7 +381,7 @@ function renderSummary() {
 function renderLocs() {
   const el = document.getElementById('locsList');
   if (!DATA.locations.length) {
-    el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點，點右上角 ＋ 新增</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點，點下方 ＋ 新增</p></div>`;
     return;
   }
   el.innerHTML = DATA.locations.map(locHTML).join('') +
