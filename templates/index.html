@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block title %}首頁{% endblock %}
+
+{% block content %}
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-top">
+    <h1>🏠 食物<span>庫存</span></h1>
+    <button class="add-btn" onclick="showSheet('addLocSheet')" title="新增存放地點">＋</button>
+  </div>
+</div>
+
+<!-- ── Summary ── -->
+<div class="summary">
+  <div class="summary-card {% if total_expired %}danger{% else %}ok{% endif %}">
+    <div class="num">{{ total_expired }}</div><div class="label">已過期</div>
+  </div>
+  <div class="summary-card {% if total_expiring %}warn{% else %}ok{% endif %}">
+    <div class="num">{{ total_expiring }}</div><div class="label">即將到期</div>
+  </div>
+  <div class="summary-card ok">
+    <div class="num">{{ total_items }}</div><div class="label">總食物數</div>
+  </div>
+</div>
+
+<!-- ── Location list ── -->
+<div class="loc-list">
+  {% if cards %}
+    {% for c in cards %}
+    <a href="/location/{{ c.id }}" class="loc-card">
+      <div class="loc-emoji">{{ c.icon }}</div>
+      <div class="loc-info">
+        <div class="loc-name">{{ c.name }}</div>
+        <div class="loc-meta">{{ c.count }} 項食物</div>
+      </div>
+      <div class="loc-right">
+        {% if c.expired %}
+          <span class="badge badge-danger">{{ c.expired }} 過期</span>
+        {% elif c.expiring %}
+          <span class="badge badge-warn">{{ c.expiring }} 快到期</span>
+        {% elif c.count %}
+          <span class="badge badge-ok">良好</span>
+        {% else %}
+          <span class="badge badge-none">空的</span>
+        {% endif %}
+        <span class="loc-arrow">›</span>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+  <div class="empty">
+    <div class="empty-icon">🏠</div>
+    <h3>還沒有存放地點</h3>
+    <p>點右上角 ＋ 開始新增</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Add Location Sheet ── -->
+<div class="overlay hidden" id="addLocSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>新增存放地點</h2>
+
+    <div class="form-group">
+      <label>選擇圖示</label>
+      <div class="emoji-grid" id="locEmojiGrid"></div>
+      <input type="hidden" id="locIcon" value="🧊">
+    </div>
+    <div class="form-group">
+      <label>名稱</label>
+      <input type="text" id="locName" placeholder="例：冰箱、零食抽屜、儲藏室"
+             onkeydown="if(event.key==='Enter') addLocation()">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="hideSheet('addLocSheet')">取消</button>
+      <button class="btn btn-primary" onclick="addLocation()">新增</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Header */
+  .header {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    padding: 52px 20px 14px;
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .header h1 span { color: var(--primary); }
+
+  /* Summary */
+  .summary {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; padding: 14px 16px;
+  }
+  .summary-card {
+    background: var(--card); border-radius: var(--radius-sm);
+    padding: 12px; text-align: center; box-shadow: var(--shadow);
+  }
+  .summary-card .num { font-size: 24px; font-weight: 700; }
+  .summary-card .label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .summary-card.danger .num { color: var(--danger); }
+  .summary-card.warn .num   { color: var(--warn); }
+  .summary-card.ok .num     { color: var(--ok); }
+
+  /* Location list */
+  .loc-list { padding: 0 16px 100px; display: flex; flex-direction: column; gap: 10px; }
+  .loc-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 14px 16px; display: flex; align-items: center; gap: 14px;
+    box-shadow: var(--shadow); text-decoration: none; color: var(--text);
+    transition: transform 0.12s;
+  }
+  .loc-card:active { transform: scale(0.98); }
+  .loc-emoji { font-size: 30px; line-height: 1; flex-shrink: 0; }
+  .loc-info { flex: 1; min-width: 0; }
+  .loc-name { font-size: 16px; font-weight: 600; }
+  .loc-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .loc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .loc-arrow { font-size: 20px; color: var(--text3); }
+
+  /* Empty */
+  .empty { text-align: center; padding: 70px 20px; color: var(--text2); }
+  .empty-icon { font-size: 54px; margin-bottom: 14px; }
+  .empty h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .empty p { font-size: 14px; color: var(--text3); }
+</style>
+
+<script>
+  const LOC_EMOJIS = ['🧊','❄️','🗄️','📦','🥬','🍳','🍷','🥫','🧺','🏺','🥩','🧁','🍱','🫙','🧂','☕'];
+  let selectedLocEmoji = '🧊';
+
+  (function buildLocGrid() {
+    const g = document.getElementById('locEmojiGrid');
+    g.innerHTML = LOC_EMOJIS.map(e =>
+      `<div class="emoji-opt${e===selectedLocEmoji?' selected':''}" onclick="pickLocEmoji('${e}',this)">${e}</div>`
+    ).join('');
+  })();
+
+  function pickLocEmoji(e, el) {
+    selectedLocEmoji = e;
+    document.getElementById('locIcon').value = e;
+    document.querySelectorAll('#locEmojiGrid .emoji-opt').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  async function addLocation() {
+    const name = document.getElementById('locName').value.trim();
+    if (!name) { toast('請輸入名稱', 'error'); return; }
+    const icon = document.getElementById('locIcon').value;
+
+    const resp = await fetch('/api/locations', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, icon}),
+    });
+    if (resp.ok) { toast('已新增「' + name + '」'); location.reload(); }
+    else toast('新增失敗', 'error');
+  }
+
+  // Reset sheet on open
+  document.querySelector('[onclick="showSheet(\'addLocSheet\')"]').addEventListener('click', () => {
+    document.getElementById('locName').value = '';
+    setTimeout(() => document.getElementById('locName').focus(), 100);
+  });
+</script>
+{% endblock %}

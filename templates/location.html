@@ -1,0 +1,618 @@
+{% extends 'base.html' %}
+{% block title %}食物庫存{% endblock %}
+
+{% block content %}
+<!-- ── Header ── -->
+<div class="header">
+  <div class="header-top">
+    <div style="display:flex;align-items:center;gap:10px">
+      <a href="/" class="back-btn">‹</a>
+      <h1 id="pageTitle">載入中...</h1>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="icon-btn" onclick="showSheet('editLocSheet')" title="編輯">✏️</button>
+      <button class="add-btn" onclick="openAddSheet()" title="新增食物">＋</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Filter tabs ── -->
+<div class="filter-tabs" id="filterTabs">
+  <div class="tab active" onclick="setFilter('all',this)">全部</div>
+  <div class="tab" onclick="setFilter('danger',this)">⚠️ 快到期</div>
+  <div class="tab" onclick="setFilter('warn',this)">🟡 注意</div>
+  <div class="tab" onclick="setFilter('ok',this)">✅ 新鮮</div>
+  <div class="tab" onclick="setFilter('none',this)">🕰 無到期</div>
+</div>
+
+<!-- ── Summary ── -->
+<div class="summary" id="summary"></div>
+
+<!-- ── List ── -->
+<div class="list" id="list"></div>
+
+<!-- ═══ 新增食物 Sheet ═══ -->
+<div class="overlay hidden" id="addSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>新增食物</h2>
+
+    <div class="step-label">語音 / 文字輸入</div>
+    <div class="voice-row">
+      <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎤</button>
+      <textarea class="form-group" id="voiceText" rows="3" style="flex:1;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);outline:none;resize:none"
+        placeholder="說出或打入食物描述&#10;例：今天買了一瓶豆漿，三天後到期"></textarea>
+    </div>
+    <p id="voiceStatus" class="voice-status"></p>
+
+    <button class="btn btn-primary" id="parseBtn" onclick="parseText()"
+            style="width:100%;margin:10px 0 0">🔍 解析文字</button>
+
+    <div id="addFormSection" style="display:none">
+      <div class="divider"></div>
+      <div class="step-label">確認 / 修改資料</div>
+
+      <div class="form-group"><label>選擇圖示</label>
+        <div class="emoji-grid" id="addEmojiGrid"></div>
+        <input type="hidden" id="aEmoji" value="🍱">
+      </div>
+      <div class="form-group"><label>名稱 *</label>
+        <input type="text" id="aName" placeholder="食物名稱">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>數量</label>
+          <div class="qty-row">
+            <button class="qty-btn" onclick="aQtyChange(-1)">−</button>
+            <div class="qty-val" id="aQtyDisplay">1</div>
+            <button class="qty-btn" onclick="aQtyChange(1)">＋</button>
+          </div>
+        </div>
+        <div class="form-group"><label>單位</label>
+          <input type="text" id="aUnit" placeholder="個/瓶/包/盒">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>購買日期</label>
+          <input type="date" id="aPurchase">
+        </div>
+        <div class="form-group"><label>到期日</label>
+          <input type="date" id="aExpiry">
+        </div>
+      </div>
+      <div class="form-group"><label>備註（選填）</label>
+        <input type="text" id="aNotes" placeholder="">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-cancel" onclick="hideSheet('addSheet')">取消</button>
+        <button class="btn btn-primary" onclick="submitAdd()">確認新增</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 編輯食物 Sheet ═══ -->
+<div class="overlay hidden" id="editSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>編輯食物</h2>
+    <input type="hidden" id="eId">
+
+    <div class="form-group"><label>選擇圖示</label>
+      <div class="emoji-grid" id="editEmojiGrid"></div>
+      <input type="hidden" id="eEmoji" value="🍱">
+    </div>
+    <div class="form-group"><label>名稱 *</label>
+      <input type="text" id="eName">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>數量</label>
+        <div class="qty-row">
+          <button class="qty-btn" onclick="eQtyChange(-1)">−</button>
+          <div class="qty-val" id="eQtyDisplay">1</div>
+          <button class="qty-btn" onclick="eQtyChange(1)">＋</button>
+        </div>
+      </div>
+      <div class="form-group"><label>單位</label>
+        <input type="text" id="eUnit">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>購買日期</label>
+        <input type="date" id="ePurchase">
+      </div>
+      <div class="form-group"><label>到期日</label>
+        <input type="date" id="eExpiry">
+      </div>
+    </div>
+    <div class="form-group"><label>移至其他地點</label>
+      <select id="eLocation" style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:15px;font-family:inherit;color:var(--text);background:var(--bg);width:100%;outline:none"></select>
+    </div>
+    <div class="form-group"><label>備註</label>
+      <input type="text" id="eNotes">
+    </div>
+    <div style="margin-top:4px">
+      <button class="btn-danger-text" onclick="deleteFromEdit()">🗑 刪除此食物</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="hideSheet('editSheet')">取消</button>
+      <button class="btn btn-primary" onclick="submitEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 編輯地點 Sheet ═══ -->
+<div class="overlay hidden" id="editLocSheet">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>編輯存放地點</h2>
+    <div class="form-group"><label>名稱</label>
+      <input type="text" id="editLocName">
+    </div>
+    <div style="margin-top:4px">
+      <button class="btn-danger-text" onclick="deleteLocation()">🗑 刪除此地點（含所有食物）</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="hideSheet('editLocSheet')">取消</button>
+      <button class="btn btn-primary" onclick="saveLocation()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Header */
+  .header {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    padding: 52px 16px 14px;
+    position: sticky; top: 0; z-index: 100;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .back-btn {
+    font-size: 28px; color: var(--primary); text-decoration: none;
+    line-height: 1; font-weight: 300; padding: 0 4px;
+  }
+
+  /* Filter tabs */
+  .filter-tabs {
+    display: flex; gap: 8px; padding: 12px 16px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .filter-tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    white-space: nowrap; border: 1.5px solid var(--border);
+    background: var(--card); color: var(--text2);
+    transition: all 0.15s;
+  }
+  .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* Summary */
+  .summary {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; padding: 0 16px 12px;
+  }
+  .summary-card {
+    background: var(--card); border-radius: var(--radius-sm);
+    padding: 10px; text-align: center; box-shadow: var(--shadow);
+  }
+  .summary-card .num { font-size: 20px; font-weight: 700; }
+  .summary-card .label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .summary-card.danger .num { color: var(--danger); }
+  .summary-card.warn .num   { color: var(--warn); }
+  .summary-card.ok .num     { color: var(--ok); }
+
+  /* List */
+  .list { padding: 0 16px 100px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Item card */
+  .item-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 13px 14px; display: flex; align-items: center; gap: 12px;
+    box-shadow: var(--shadow); cursor: pointer; transition: transform 0.12s;
+    position: relative; overflow: hidden;
+  }
+  .item-card:active { transform: scale(0.98); }
+  .item-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  }
+  .item-card.status-danger::before { background: var(--danger); }
+  .item-card.status-warn::before   { background: var(--warn);   }
+  .item-card.status-ok::before     { background: var(--ok);     }
+  .item-card.status-none::before   { background: var(--border); }
+  .item-emoji { font-size: 30px; line-height: 1; flex-shrink: 0; }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name { font-size: 15px; font-weight: 600; }
+  .item-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
+  .item-tag {
+    display: inline-block; background: var(--primary-dim);
+    color: var(--primary); padding: 2px 7px;
+    border-radius: 6px; font-size: 11px; font-weight: 500; margin-right: 4px;
+  }
+
+  /* Section title */
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text3);
+    letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 4px 0 6px;
+  }
+
+  /* Empty */
+  .empty { text-align: center; padding: 70px 20px; color: var(--text2); }
+  .empty-icon { font-size: 54px; margin-bottom: 14px; }
+  .empty h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .empty p { font-size: 14px; color: var(--text3); }
+</style>
+
+<script>
+  const LOC_ID  = {{ location.id }};
+  let ITEMS     = {{ items_json|safe }};
+  const LOCS    = {{ locations_json|safe }};
+  let activeFilter = 'all';
+  let aQty = 1, eQty = 1;
+
+  const FOOD_EMOJIS = ['🥚','🥛','🧀','🥩','🥦','🥕','🍎','🍌','🍋','🫐','🍓','🍇','🧅','🧄','🫑','🌽','🥬','🍅','🥑','🫒','🐟','🍤','🥗','🌮','🥜','🍜','🍣','🥤','🧃','🍺','🧂','🫙','🥫','🧈','🍳','🫕','🍱','🧆','🫘','🌾'];
+  const EMOJI_MAP = [
+    [['牛奶','鮮奶','豆漿','米漿'],'🥛'], [['雞蛋','蛋'],'🥚'], [['豬','排','肉'],'🥩'],
+    [['雞','雞胸','雞腿'],'🍗'], [['魚','鮭魚','鯖魚','鱸魚'],'🐟'], [['蝦','海鮮'],'🦐'],
+    [['菠菜','青菜','蔬菜','菜'],'🥬'], [['花椰菜','花菜','青花'],'🥦'],
+    [['蘿蔔','紅蘿蔔'],'🥕'], [['番茄','蕃茄','小番茄'],'🍅'],
+    [['蘋果'],'🍎'], [['香蕉'],'🍌'], [['草莓'],'🍓'], [['葡萄'],'🍇'],
+    [['藍莓'],'🫐'], [['橘子','柳橙'],'🍊'], [['可樂','汽水','飲料'],'🥤'],
+    [['咖啡'],'☕'], [['麵','泡麵','拉麵'],'🍜'], [['飯','白飯','米飯'],'🍚'],
+    [['起司','乳酪'],'🧀'], [['奶油','牛油'],'🧈'], [['餅乾'],'🍪'],
+    [['豆腐'],'🟦'], [['啤酒'],'🍺'], [['豬血糕'],'🫙'],
+  ];
+
+  function autoEmoji(name) {
+    for (const [kws, e] of EMOJI_MAP) {
+      if (kws.some(k => name.includes(k))) return e;
+    }
+    return '🍱';
+  }
+
+  // ── Date helpers ─────────────────────────────────────────────
+  function daysLeft(d) {
+    if (!d) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const exp   = new Date(d); exp.setHours(0,0,0,0);
+    return Math.round((exp - today) / 86400000);
+  }
+  function getStatus(item) {
+    const d = daysLeft(item.expiry_date);
+    if (d === null) return 'none';
+    if (d < 0)   return 'danger';
+    if (d <= 3)  return 'danger';
+    if (d <= 7)  return 'warn';
+    return 'ok';
+  }
+  function badgeText(item) {
+    const d = daysLeft(item.expiry_date);
+    if (d === null) return '無到期';
+    if (d < 0)  return `過期 ${Math.abs(d)} 天`;
+    if (d === 0) return '今天到期！';
+    if (d === 1) return '明天到期';
+    return `還剩 ${d} 天`;
+  }
+  function fmtDate(s) {
+    if (!s) return '—';
+    return s.replace(/-/g, '/').replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, '$1/$2/$3');
+  }
+
+  // ── Render ───────────────────────────────────────────────────
+  function setFilter(f, el) {
+    activeFilter = f;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    render();
+  }
+
+  function render() {
+    // Update page title
+    const loc = LOCS.find(l => l.id === LOC_ID);
+    if (loc) {
+      document.getElementById('pageTitle').textContent = loc.icon + ' ' + loc.name;
+      document.getElementById('editLocName').value = loc.name;
+    }
+
+    // Filter
+    const visible = ITEMS.filter(item => {
+      if (activeFilter === 'all')    return true;
+      if (activeFilter === 'danger') return getStatus(item) === 'danger';
+      if (activeFilter === 'warn')   return getStatus(item) === 'warn';
+      if (activeFilter === 'ok')     return getStatus(item) === 'ok';
+      if (activeFilter === 'none')   return !item.expiry_date;
+      return true;
+    });
+
+    // Sort: expired/soon first, then fresh, then no expiry
+    const sorted = [...visible].sort((a, b) => {
+      const da = daysLeft(a.expiry_date), db = daysLeft(b.expiry_date);
+      if (da === null && db === null) return 0;
+      if (da === null) return 1;
+      if (db === null) return -1;
+      return da - db;
+    });
+
+    // Summary
+    const expired  = ITEMS.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d < 0; }).length;
+    const critical = ITEMS.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d >= 0 && d <= 7; }).length;
+    const fresh    = ITEMS.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d > 7; }).length;
+    document.getElementById('summary').innerHTML = `
+      <div class="summary-card ${expired?'danger':'ok'}">
+        <div class="num">${expired}</div><div class="label">已過期</div>
+      </div>
+      <div class="summary-card ${critical?'warn':'ok'}">
+        <div class="num">${critical}</div><div class="label">快到期</div>
+      </div>
+      <div class="summary-card ok">
+        <div class="num">${fresh}</div><div class="label">新鮮</div>
+      </div>`;
+
+    // List
+    const listEl = document.getElementById('list');
+    if (sorted.length === 0) {
+      listEl.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div>
+        <h3>這裡還沒有食物</h3><p>點右上角 ＋ 新增</p></div>`;
+      return;
+    }
+    listEl.innerHTML = sorted.map(item => {
+      const st = getStatus(item);
+      const qty = item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1);
+      return `<div class="item-card status-${st}" onclick="openEditSheet(${item.id})">
+        <div class="item-emoji">${item.emoji || '🍱'}</div>
+        <div class="item-info">
+          <div class="item-name">${item.name}
+            ${item.quantity > 1 || item.unit !== '個'
+              ? `<span style="font-size:12px;color:var(--text2);font-weight:400"> ×${qty}${item.unit}</span>`
+              : ''}
+          </div>
+          <div class="item-meta">
+            ${item.purchase_date ? `<span class="item-tag">購買 ${fmtDate(item.purchase_date)}</span>` : ''}
+            ${item.notes ? item.notes : ''}
+          </div>
+        </div>
+        <div class="badge badge-${st}">${badgeText(item)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Emoji pickers ─────────────────────────────────────────────
+  function buildEmojiGrid(gridId, hiddenId, selected) {
+    document.getElementById(gridId).innerHTML = FOOD_EMOJIS.map(e =>
+      `<div class="emoji-opt${e===selected?' selected':''}"
+            onclick="pickEmoji('${gridId}','${hiddenId}','${e}',this)">${e}</div>`
+    ).join('');
+  }
+  function pickEmoji(gridId, hiddenId, e, el) {
+    document.getElementById(hiddenId).value = e;
+    document.querySelectorAll('#' + gridId + ' .emoji-opt').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+  function setEmojiSelected(gridId, hiddenId, e) {
+    document.getElementById(hiddenId).value = e;
+    document.querySelectorAll('#' + gridId + ' .emoji-opt').forEach(x => {
+      x.classList.toggle('selected', x.textContent === e);
+    });
+  }
+
+  // ── Qty helpers ───────────────────────────────────────────────
+  function aQtyChange(d) { aQty = Math.max(0.1, aQty + d); document.getElementById('aQtyDisplay').textContent = aQty % 1 === 0 ? aQty : aQty.toFixed(1); }
+  function eQtyChange(d) { eQty = Math.max(0.1, eQty + d); document.getElementById('eQtyDisplay').textContent = eQty % 1 === 0 ? eQty : eQty.toFixed(1); }
+
+  // ── Voice ─────────────────────────────────────────────────────
+  let recog = null, isRec = false;
+  const voiceBtnEl = document.getElementById('voiceBtn');
+
+  function toggleVoice() { isRec ? stopVoice() : startVoice(); }
+  function startVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast('請使用 Chrome 或 Edge 瀏覽器', 'error'); return; }
+    recog = new SR(); recog.lang = 'zh-TW'; recog.continuous = false; recog.interimResults = true;
+    recog.onstart = () => {
+      isRec = true; voiceBtnEl.classList.add('recording'); voiceBtnEl.textContent = '⏹';
+      setVS('🔴 錄音中⋯');
+    };
+    recog.onresult = e => {
+      let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+      document.getElementById('voiceText').value = t;
+    };
+    recog.onend = () => {
+      isRec = false; voiceBtnEl.classList.remove('recording'); voiceBtnEl.textContent = '🎤';
+      setVS('✅ 完成，按「解析文字」繼續');
+    };
+    recog.onerror = e => {
+      isRec = false; voiceBtnEl.classList.remove('recording'); voiceBtnEl.textContent = '🎤';
+      setVS('⚠️ 錯誤：' + e.error);
+    };
+    recog.start();
+  }
+  function stopVoice() { recog && recog.stop(); }
+  function setVS(msg) { document.getElementById('voiceStatus').textContent = msg; }
+
+  // ── Parse ─────────────────────────────────────────────────────
+  async function parseText() {
+    const text = document.getElementById('voiceText').value.trim();
+    if (!text) { toast('請先輸入描述', 'error'); return; }
+
+    const btn = document.getElementById('parseBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 解析中⋯';
+    try {
+      const r = await fetch('/api/parse', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({text}),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || '解析失敗');
+
+      document.getElementById('aName').value    = d.name || '';
+      aQty = d.quantity || 1;
+      document.getElementById('aQtyDisplay').textContent = aQty % 1 === 0 ? aQty : aQty.toFixed(1);
+      document.getElementById('aUnit').value    = d.unit || '個';
+      document.getElementById('aPurchase').value = d.purchase_date || '';
+      document.getElementById('aExpiry').value   = d.expiry_date   || '';
+
+      // Auto-select emoji
+      const emoji = autoEmoji(d.name || '');
+      setEmojiSelected('addEmojiGrid', 'aEmoji', emoji);
+
+      document.getElementById('addFormSection').style.display = '';
+      toast('解析完成，請確認資料');
+
+      setTimeout(() => {
+        document.getElementById('addFormSection').scrollIntoView({behavior:'smooth', block:'nearest'});
+      }, 80);
+    } catch(e) {
+      toast('解析失敗：' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🔍 解析文字';
+    }
+  }
+
+  // ── Add item ──────────────────────────────────────────────────
+  function openAddSheet() {
+    document.getElementById('voiceText').value = '';
+    document.getElementById('voiceStatus').textContent = '';
+    document.getElementById('addFormSection').style.display = 'none';
+    document.getElementById('aName').value = '';
+    aQty = 1; document.getElementById('aQtyDisplay').textContent = '1';
+    document.getElementById('aUnit').value = '個';
+    document.getElementById('aPurchase').value = '';
+    document.getElementById('aExpiry').value   = '';
+    document.getElementById('aNotes').value    = '';
+    buildEmojiGrid('addEmojiGrid', 'aEmoji', '🍱');
+    showSheet('addSheet');
+  }
+
+  async function submitAdd() {
+    const name = document.getElementById('aName').value.trim();
+    if (!name) { toast('請填寫食物名稱', 'error'); return; }
+    const resp = await fetch('/api/items', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        location_id:   LOC_ID,
+        name,
+        emoji:         document.getElementById('aEmoji').value,
+        quantity:      aQty,
+        unit:          document.getElementById('aUnit').value || '個',
+        purchase_date: document.getElementById('aPurchase').value || null,
+        expiry_date:   document.getElementById('aExpiry').value   || null,
+        notes:         document.getElementById('aNotes').value,
+      }),
+    });
+    if (resp.ok) {
+      const newItem = await resp.json();
+      ITEMS.push(newItem);
+      toast('✅ 已新增「' + name + '」');
+      hideSheet('addSheet');
+      render();
+    } else {
+      toast('新增失敗', 'error');
+    }
+  }
+
+  // ── Edit item ─────────────────────────────────────────────────
+  function openEditSheet(id) {
+    const item = ITEMS.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('eId').value       = item.id;
+    document.getElementById('eName').value      = item.name;
+    eQty = item.quantity;
+    document.getElementById('eQtyDisplay').textContent = eQty % 1 === 0 ? eQty : eQty.toFixed(1);
+    document.getElementById('eUnit').value      = item.unit;
+    document.getElementById('ePurchase').value  = item.purchase_date || '';
+    document.getElementById('eExpiry').value    = item.expiry_date   || '';
+    document.getElementById('eNotes').value     = item.notes || '';
+
+    // Location select
+    document.getElementById('eLocation').innerHTML =
+      LOCS.map(l => `<option value="${l.id}"${l.id===item.location_id?' selected':''}>${l.icon} ${l.name}</option>`).join('');
+
+    // Emoji
+    buildEmojiGrid('editEmojiGrid', 'eEmoji', item.emoji || '🍱');
+    document.getElementById('eEmoji').value = item.emoji || '🍱';
+
+    showSheet('editSheet');
+  }
+
+  async function submitEdit() {
+    const id   = document.getElementById('eId').value;
+    const name = document.getElementById('eName').value.trim();
+    if (!name) { toast('名稱不能為空', 'error'); return; }
+
+    const resp = await fetch(`/api/items/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name,
+        emoji:         document.getElementById('eEmoji').value,
+        quantity:      eQty,
+        unit:          document.getElementById('eUnit').value,
+        location_id:   parseInt(document.getElementById('eLocation').value),
+        purchase_date: document.getElementById('ePurchase').value || null,
+        expiry_date:   document.getElementById('eExpiry').value   || null,
+        notes:         document.getElementById('eNotes').value,
+      }),
+    });
+    if (resp.ok) {
+      const updated = await resp.json();
+      ITEMS = ITEMS.map(i => i.id === parseInt(id) ? updated : i);
+      // If moved to another location, remove from this view
+      if (updated.location_id !== LOC_ID) ITEMS = ITEMS.filter(i => i.id !== parseInt(id));
+      toast('已儲存');
+      hideSheet('editSheet');
+      render();
+    } else {
+      toast('儲存失敗', 'error');
+    }
+  }
+
+  async function deleteFromEdit() {
+    const id   = document.getElementById('eId').value;
+    const name = document.getElementById('eName').value;
+    if (!confirm(`確定要刪除「${name}」嗎？`)) return;
+    const resp = await fetch(`/api/items/${id}`, {method:'DELETE'});
+    if (resp.ok) {
+      ITEMS = ITEMS.filter(i => i.id !== parseInt(id));
+      toast('已刪除「' + name + '」');
+      hideSheet('editSheet');
+      render();
+    } else {
+      toast('刪除失敗', 'error');
+    }
+  }
+
+  // ── Location edit/delete ──────────────────────────────────────
+  async function saveLocation() {
+    const name = document.getElementById('editLocName').value.trim();
+    if (!name) { toast('名稱不能為空', 'error'); return; }
+    const resp = await fetch(`/api/locations/${LOC_ID}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name}),
+    });
+    if (resp.ok) {
+      // Update local LOCS
+      const idx = LOCS.findIndex(l => l.id === LOC_ID);
+      if (idx >= 0) LOCS[idx].name = name;
+      toast('已儲存');
+      hideSheet('editLocSheet');
+      render();
+    } else {
+      toast('儲存失敗', 'error');
+    }
+  }
+
+  async function deleteLocation() {
+    if (!confirm('確定要刪除這個存放地點嗎？底下的食物也會一起刪除。')) return;
+    const resp = await fetch(`/api/locations/${LOC_ID}`, {method:'DELETE'});
+    if (resp.ok) window.location.href = '/';
+    else toast('刪除失敗', 'error');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+  render();
+</script>
+{% endblock %}

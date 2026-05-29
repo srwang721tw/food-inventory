@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>{% block title %}食物庫存{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:           #f2f2f7;
+      --card:         #ffffff;
+      --card2:        #f9f9fb;
+      --primary:      #30b0c7;
+      --primary-dim:  #e8f7fa;
+      --danger:       #ff3b30;
+      --danger-dim:   #fff0ef;
+      --warn:         #ff9500;
+      --warn-dim:     #fff8ed;
+      --ok:           #34c759;
+      --ok-dim:       #edfbf1;
+      --text:         #1c1c1e;
+      --text2:        #636366;
+      --text3:        #aeaeb2;
+      --border:       #e5e5ea;
+      --shadow:       0 2px 16px rgba(0,0,0,0.08);
+      --radius:       16px;
+      --radius-sm:    10px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      max-width: 430px;
+      margin: 0 auto;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ── Overlay / Bottom Sheet ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+    }
+    .overlay.hidden { display: none; }
+    .sheet {
+      background: var(--card);
+      border-radius: 24px 24px 0 0;
+      padding: 0 20px 40px;
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      animation: slideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+      scrollbar-width: none;
+    }
+    .sheet::-webkit-scrollbar { display: none; }
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 14px auto 18px;
+    }
+    .sheet h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+    @keyframes slideUp { from { transform: translateY(100%); } }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block; font-size: 13px;
+      font-weight: 500; color: var(--text2); margin-bottom: 5px;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 11px 13px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      font-size: 15px; font-family: inherit;
+      color: var(--text); background: var(--bg);
+      outline: none; transition: border-color 0.15s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus { border-color: var(--primary); }
+    .form-group input::placeholder,
+    .form-group textarea::placeholder { color: var(--text3); }
+    .form-group textarea { resize: none; min-height: 64px; line-height: 1.5; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+    .btn {
+      flex: 1; padding: 13px;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 15px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { opacity: 0.8; transform: scale(0.98); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-cancel  { background: var(--bg); color: var(--text2); }
+    .btn-danger-text { background: transparent; color: var(--danger); border: none;
+                       font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; padding: 8px 0; }
+
+    .icon-btn {
+      width: 34px; height: 34px;
+      border: none; border-radius: 50%;
+      background: var(--bg); color: var(--text2);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    .icon-btn:active { background: var(--border); }
+
+    .add-btn {
+      width: 34px; height: 34px;
+      background: var(--primary); border: none; border-radius: 50%;
+      color: #fff; font-size: 20px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(48,176,199,0.4);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+    .add-btn:active { transform: scale(0.9); box-shadow: 0 2px 6px rgba(48,176,199,0.3); }
+
+    /* ── Emoji grid ── */
+    .emoji-grid {
+      display: grid; grid-template-columns: repeat(8, 1fr);
+      gap: 5px; margin-bottom: 16px;
+    }
+    .emoji-opt {
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; border-radius: 8px; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .emoji-opt:active,
+    .emoji-opt.selected { background: var(--primary-dim); }
+
+    /* ── Qty control ── */
+    .qty-row { display: flex; align-items: center; gap: 10px; }
+    .qty-btn {
+      width: 30px; height: 30px; flex-shrink: 0;
+      border-radius: 50%; border: 1.5px solid var(--border);
+      background: var(--bg); color: var(--text);
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-family: inherit;
+    }
+    .qty-val { font-size: 16px; font-weight: 600; min-width: 28px; text-align: center; }
+
+    /* ── Badges ── */
+    .badge {
+      padding: 3px 9px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; flex-shrink: 0;
+    }
+    .badge-danger  { background: var(--danger-dim); color: var(--danger); }
+    .badge-warn    { background: var(--warn-dim);   color: var(--warn);   }
+    .badge-ok      { background: var(--ok-dim);     color: var(--ok);     }
+    .badge-none    { background: var(--bg);         color: var(--text3);  }
+
+    /* ── Toast ── */
+    #toasts {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column;
+      gap: 6px; align-items: center; pointer-events: none;
+      width: 90%; max-width: 380px;
+    }
+    .toast {
+      background: rgba(30,30,32,0.92);
+      color: #fff; padding: 10px 16px;
+      border-radius: 20px; font-size: 14px; font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      animation: toastIn 0.2s ease;
+    }
+    .toast.error { background: rgba(255,59,48,0.92); }
+    @keyframes toastIn {
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Step label ── */
+    .step-label {
+      font-size: 11px; font-weight: 700;
+      color: var(--primary); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .step-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Voice button ── */
+    .voice-btn {
+      width: 48px; height: 48px; flex-shrink: 0;
+      border-radius: 50%;
+      background: var(--primary-dim); border: 2px solid var(--primary);
+      color: var(--primary); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; transition: all 0.18s;
+    }
+    .voice-btn:hover { background: var(--primary); color: #fff; }
+    .voice-btn.recording {
+      background: var(--danger); border-color: var(--danger); color: #fff;
+      animation: voicePulse 1.2s ease-in-out infinite;
+    }
+    @keyframes voicePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,59,48,0.4); }
+      50%       { box-shadow: 0 0 0 10px rgba(255,59,48,0); }
+    }
+    .voice-row { display: flex; gap: 10px; align-items: flex-start; }
+    .voice-row textarea { flex: 1; }
+    .voice-status { font-size: 12px; color: var(--text3); min-height: 16px; margin-top: 5px; }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+  </style>
+</head>
+<body>
+
+{% block content %}{% endblock %}
+
+<div id="toasts"></div>
+
+<script>
+  function toast(msg, type = '') {
+    const el = document.createElement('div');
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.textContent = msg;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 2800);
+  }
+
+  function showSheet(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('hidden');
+    el.querySelector('.sheet').scrollTop = 0;
+  }
+  function hideSheet(id) { document.getElementById(id).classList.add('hidden'); }
+
+  // Close on backdrop click
+  document.addEventListener('click', e => {
+    if (e.target.classList.contains('overlay')) {
+      e.target.classList.add('hidden');
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.overlay:not(.hidden)').forEach(o => o.classList.add('hidden'));
+    }
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
