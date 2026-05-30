@@ -231,7 +231,9 @@
     .sheet {
       background: var(--card); border-radius: 24px 24px 0 0;
       padding: 0 18px 40px; width: 100%; max-height: 92vh;
-      overflow-y: auto; animation: su 0.26s cubic-bezier(0.32,0.72,0,1);
+      overflow-y: auto; overflow-x: hidden;
+      touch-action: pan-y; overscroll-behavior-x: none;
+      animation: su 0.26s cubic-bezier(0.32,0.72,0,1);
       scrollbar-width: none; transition: background 0.2s;
     }
     .sheet::-webkit-scrollbar { display: none; }
@@ -390,10 +392,8 @@
       </div>
       <div class="fg"><label>單位</label><input type="text" id="eUnit"></div>
     </div>
-    <div class="frow">
-      <div class="fg"><label>購買日期</label><input type="date" id="ePurchase"></div>
-      <div class="fg"><label>到期日</label><input type="date" id="eExpiry"></div>
-    </div>
+    <div class="fg"><label>購買日期</label><input type="date" id="ePurchase"></div>
+    <div class="fg"><label>到期日</label><input type="date" id="eExpiry"></div>
     <div class="fg"><label>存放地點</label>
       <select id="eLoc" style="border:1.5px solid var(--border);border-radius:var(--rsm);padding:10px 12px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);width:100%;outline:none"></select>
     </div>
@@ -703,13 +703,14 @@ function closeAllSwipes(exceptId) {
 }
 
 function initSwipe(wrap, card, itemId) {
-  let sx = 0, sy = 0, dx = 0, moved = false, startOffset = 0;
+  let sx = 0, sy = 0, dx = 0, moved = false, startOffset = 0, startTarget = null;
 
   card.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
     dx = 0; moved = false;
+    startTarget = e.target;
     const m = (card.style.transform || '').match(/translateX\((-?[\d.]+)px\)/);
     startOffset = m ? parseFloat(m[1]) : 0;
     card.style.transition = 'none';
@@ -732,7 +733,12 @@ function initSwipe(wrap, card, itemId) {
     const finalX = startOffset + dx;
     if (!moved) {
       if (startOffset < -10) {
-        // Was swiped open → close; suppress the click so edit doesn't open
+        // Was swiped open
+        if (startTarget && startTarget.closest('.swipe-del')) {
+          // User tapped the delete button — let the click fire through
+          return;
+        }
+        // Tapped elsewhere → close swipe and suppress click
         card.style.transform = '';
         e.preventDefault();
       }
@@ -1025,10 +1031,8 @@ function prevEditHTML(item) {
       </div>
       <div class="fg"><label>單位</label><input value="${escHtml(item.unit||'個')}" oninput="pUpdate('${item._id}','unit',this.value)"></div>
     </div>
-    <div class="frow">
-      <div class="fg"><label>購買日期</label><input type="date" value="${item.purchase_date||''}" onchange="pUpdate('${item._id}','purchase_date',this.value)"></div>
-      <div class="fg"><label>到期日</label><input type="date" value="${item.expiry_date||''}" onchange="pUpdate('${item._id}','expiry_date',this.value)"></div>
-    </div>
+    <div class="fg"><label>購買日期</label><input type="date" value="${item.purchase_date||''}" onchange="pUpdate('${item._id}','purchase_date',this.value)"></div>
+    <div class="fg"><label>到期日</label><input type="date" value="${item.expiry_date||''}" onchange="pUpdate('${item._id}','expiry_date',this.value)"></div>
     <button class="btn-del" onclick="pRemove('${item._id}')">🗑 移除此項</button>
   </div>`;
 }
