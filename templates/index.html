@@ -170,16 +170,29 @@
     .item-card {
       display: flex; align-items: center; gap: 11px;
       padding: 11px 14px 11px 20px;
-      cursor: pointer; background: var(--card);
+      cursor: default; background: var(--card);
       position: relative; overflow: visible;
       transition: transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    /* Only emoji + name area are click targets for edit */
+    .item-emoji { cursor: pointer; flex-shrink: 0; font-size: 26px; line-height: 1; }
+    .item-info  { flex: 1; min-width: 0; cursor: pointer; }
+    /* Desktop hover-reveal delete button */
+    .del-hover {
+      display: none; flex-shrink: 0;
+      background: none; border: none; color: var(--text3);
+      font-size: 18px; cursor: pointer; padding: 4px 6px;
+      border-radius: 6px; transition: color 0.12s;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .del-hover { display: flex; align-items: center; opacity: 0; transition: opacity 0.15s; }
+      .item-card:hover .del-hover { opacity: 1; color: var(--danger); }
     }
     .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
     .item-card.sd::before { background: var(--danger); }
     .item-card.sw::before { background: var(--warn); }
     .item-card.sg::before { background: var(--ok); }
-    .item-emoji { font-size: 26px; line-height: 1; flex-shrink: 0; }
-    .item-info  { flex: 1; min-width: 0; }
+    /* .item-emoji and .item-info cursor/size defined below with del-hover */
     .item-name  { font-size: 14px; font-weight: 600; }
     .item-meta  { font-size: 11px; color: var(--text2); margin-top: 2px; }
 
@@ -461,13 +474,61 @@ let previewItems = [];
 const EMOJIS = ['🥚','🥛','🧀','🥩','🥦','🥕','🍎','🍌','🍋','🫐','🍓','🍇','🧅','🧄','🫑','🌽','🥬','🍅','🥑','🫒','🐟','🍤','🥗','🌮','🥜','🍜','🍣','🥤','🧃','🍺','🧂','🫙','🥫','🧈','🍳','🫕','🍱','🧆','🫘'];
 const LOC_EMOJIS = ['🧊','❄️','🗄️','📦','🥬','🍳','🍷','🥫','🧺','🏺','🥩','🧁','☕','🫙'];
 const EMAP = [
-  [['牛奶','鮮奶','豆漿','米漿'],'🥛'],[['雞蛋','蛋'],'🥚'],[['豬','排骨','五花'],'🥩'],
-  [['雞','雞胸','雞腿','雞翅'],'🍗'],[['魚','鮭','鯖','鱸'],'🐟'],[['蝦','海鮮','蛤蜊'],'🦐'],
-  [['菜','菠菜','青菜','空心菜'],'🥬'],[['花椰','青花'],'🥦'],[['蘿蔔'],'🥕'],
-  [['番茄','蕃茄'],'🍅'],[['蘋果'],'🍎'],[['香蕉'],'🍌'],[['草莓'],'🍓'],[['葡萄'],'🍇'],
-  [['藍莓'],'🫐'],[['橘子','柳橙'],'🍊'],[['可樂','汽水','飲料','果汁'],'🥤'],
-  [['咖啡'],'☕'],[['麵','泡麵','拉麵'],'🍜'],[['飯','米飯'],'🍚'],[['起司'],'🧀'],
-  [['奶油'],'🧈'],[['餅乾'],'🍪'],[['豆腐'],'⬜'],
+  // 乳製品 / 蛋
+  [['牛奶','鮮奶','豆漿','米漿','燕麥奶','優酪乳','優格'],'🥛'],
+  [['雞蛋','蛋','蛋黃','鴨蛋'],'🥚'],
+  [['起司','乾酪'],'🧀'], [['奶油','牛油'],'🧈'],
+  // 肉類
+  [['豬','排骨','五花','豬肉','豬腳','豬排'],'🥩'],
+  [['雞','雞胸','雞腿','雞翅','雞肉'],'🍗'],
+  [['牛','牛肉','牛排','牛腩'],'🥩'],
+  [['培根'],'🥓'], [['火腿','香腸','熱狗','臘肉'],'🌭'],
+  // 海鮮
+  [['魚','鮭魚','鯖魚','鱸魚','吳郭魚','虱目魚','土魠'],'🐟'],
+  [['蝦','鮮蝦','蝦仁','草蝦'],'🦐'],
+  [['蛤蜊','蛤','蚵仔','牡蠣','蚵'],'🦪'],
+  [['花枝','魷魚','透抽','小卷'],'🦑'],
+  [['螃蟹','蟹','蟹腳'],'🦀'], [['章魚'],'🐙'],
+  // 蔬菜
+  [['菠菜','青菜','空心菜','地瓜葉','莧菜'],'🥬'],
+  [['青江菜','小白菜','娃娃菜','大白菜','高麗菜','包心菜'],'🥬'],
+  [['水蓮','茼蒿','A菜','萵苣','芥蘭'],'🌿'],
+  [['花椰','青花','花椰菜','青花菜','白花椰'],'🥦'],
+  [['蘿蔔','白蘿蔔','紅蘿蔔','胡蘿蔔'],'🥕'],
+  [['番茄','蕃茄','牛番茄','小番茄','聖女'],'🍅'],
+  [['茄子'],'🍆'], [['青椒','彩椒','甜椒'],'🫑'],
+  [['玉米'],'🌽'], [['洋蔥'],'🧅'], [['大蒜','蒜頭'],'🧄'],
+  [['薑','老薑','嫩薑','薑片'],'🫚'],
+  [['蔥','青蔥','蒜苗','韭菜','韭黃'],'🌿'],
+  [['絲瓜'],'🥒'], [['大黃瓜','小黃瓜','黃瓜','胡瓜'],'🥒'],
+  [['冬瓜','苦瓜','瓠瓜'],'🥒'], [['南瓜'],'🎃'],
+  [['地瓜','番薯','紫薯'],'🍠'], [['馬鈴薯','土豆'],'🥔'],
+  [['芋頭'],'🟫'], [['豆芽','黃豆芽','綠豆芽'],'🌱'],
+  [['金針菇','鴻喜菇','香菇','杏鮑菇','木耳','菇','蕈'],'🍄'],
+  [['豆腐','嫩豆腐','板豆腐','凍豆腐'],'⬜'],
+  [['豆干','豆皮','百頁豆腐','豆包'],'🫘'],
+  [['酪梨','牛油果'],'🥑'], [['橄欖'],'🫒'],
+  // 水果
+  [['蘋果','青蘋果'],'🍎'], [['香蕉'],'🍌'],
+  [['草莓'],'🍓'], [['葡萄'],'🍇'], [['藍莓','覆盆子'],'🫐'],
+  [['橘子','柳橙','橙','橘','椪柑'],'🍊'],
+  [['芒果'],'🥭'], [['鳳梨'],'🍍'], [['西瓜'],'🍉'],
+  [['哈密瓜','香瓜','洋香瓜'],'🍈'], [['木瓜'],'🍈'],
+  [['奇異果','kiwi'],'🥝'], [['火龍果'],'🔴'],
+  [['芭樂','番石榴'],'🍏'], [['荔枝','龍眼','桂圓'],'🍇'],
+  [['水蜜桃','桃子','李子','梅子','梨子','水梨'],'🍑'],
+  [['檸檬','萊姆'],'🍋'], [['葡萄柚'],'🍊'],
+  [['百香果'],'🌟'], [['蓮霧','楊桃'],'🍒'],
+  // 飲料
+  [['可樂','汽水','飲料','果汁','氣泡水'],'🥤'],
+  [['咖啡'],'☕'], [['茶','綠茶','紅茶','烏龍','普洱'],'🍵'],
+  [['啤酒'],'🍺'], [['紅酒','白酒','酒'],'🍷'],
+  // 主食 / 乾貨
+  [['麵','泡麵','拉麵','義大利麵','烏龍麵','冬粉','米粉'],'🍜'],
+  [['飯','白米','糙米','糯米'],'🍚'], [['麵包','吐司','貝果'],'🍞'],
+  [['餅乾','蘇打餅','消化餅'],'🍪'], [['蛋糕','甜點'],'🎂'],
+  [['花生','花生醬'],'🥜'], [['堅果','杏仁','腰果','核桃'],'🌰'],
+  [['罐頭'],'🥫'], [['醬油','醬'],'🍶'],
 ];
 function autoEmoji(name) {
   for (const [kws,e] of EMAP) if (kws.some(k => name.includes(k))) return e;
@@ -563,10 +624,13 @@ function renderLocs() {
   el.innerHTML = DATA.locations.map(locHTML).join('') +
     `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
 
-  // Bind drag handles after render
+  // Bind drag handles (touch + mouse) after render
   DATA.locations.forEach(loc => {
     const handle = document.querySelector(`#la-${loc.id} .drag-handle`);
-    if (handle) handle.addEventListener('touchstart', e => onDragHandleTouch(e, loc.id), { passive: false });
+    if (handle) {
+      handle.addEventListener('touchstart', e => onDragHandleTouch(e, loc.id), { passive: false });
+      handle.addEventListener('mousedown',  e => onDragHandleMouse(e, loc.id));
+    }
   });
 
   // Bind swipe on item cards
@@ -614,12 +678,13 @@ function itemHTML(item) {
   return `
   <div class="swipe-wrap" id="sw-${item.id}">
     <div class="item-card s${st}" id="ic-${item.id}">
-      <div class="item-emoji">${item.emoji||'🍱'}</div>
-      <div class="item-info">
+      <div class="item-emoji" onclick="openEditItem(${item.id})">${item.emoji||'🍱'}</div>
+      <div class="item-info" onclick="openEditItem(${item.id})">
         <div class="item-name">${item.name}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span></div>
         <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
       </div>
       ${badge}
+      <button class="del-hover" onclick="event.stopPropagation();swipeDelete(${item.id})" title="刪除">🗑</button>
       <button class="swipe-del" onclick="event.stopPropagation();swipeDelete(${item.id})">
         <span class="del-icon">🗑</span>刪除
       </button>
@@ -662,15 +727,16 @@ function initSwipe(wrap, card, itemId) {
     e.preventDefault();
   }, { passive: false });
 
-  card.addEventListener('touchend', () => {
+  card.addEventListener('touchend', e => {
     card.style.transition = '';
     const finalX = startOffset + dx;
     if (!moved) {
       if (startOffset < -10) {
-        card.style.transform = ''; // tap on open card → close
-      } else {
-        openEditItem(itemId);
+        // Was swiped open → close; suppress the click so edit doesn't open
+        card.style.transform = '';
+        e.preventDefault();
       }
+      // Swipe closed + no move → let click event on emoji/info fire naturally
     } else if (finalX < -38) {
       card.style.transform = 'translateX(-76px)';
       closeAllSwipes(wrap.id);
@@ -694,43 +760,29 @@ function swipeDelete(itemId) {
     .catch(() => toast('刪除失敗', 'err'));
 }
 
-// ── Drag to reorder locations ─────────────────────────────────
+// ── Drag to reorder locations (touch + mouse) ─────────────────
 let drag = null;
 
-function onDragHandleTouch(e, locId) {
-  if (e.touches.length !== 1) return;
-  e.preventDefault(); e.stopPropagation();
-
-  const touch = e.touches[0];
+function _dragStart(clientX, clientY, locId) {
   const accEl = document.getElementById('la-' + locId);
   const rect  = accEl.getBoundingClientRect();
-
-  // Create ghost clone
   const ghost = accEl.cloneNode(true);
   ghost.className = 'loc-acc drag-ghost';
   ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;`;
   document.body.appendChild(ghost);
   accEl.classList.add('dragging');
-
-  drag = { locId, accEl, ghost, offsetY: touch.clientY - rect.top };
-
-  document.addEventListener('touchmove', onDragMove, { passive: false });
-  document.addEventListener('touchend', onDragEnd, { once: true });
+  drag = { locId, accEl, ghost, offsetY: clientY - rect.top };
 }
 
-function onDragMove(e) {
+function _dragMove(clientY) {
   if (!drag) return;
-  e.preventDefault();
-  const touch = e.touches[0];
-  drag.ghost.style.top = `${touch.clientY - drag.offsetY}px`;
-
-  // Reorder in DOM to show insertion position
+  drag.ghost.style.top = `${clientY - drag.offsetY}px`;
   const locs = Array.from(document.querySelectorAll('#locsList .loc-acc:not(.dragging)'));
   const addBtn = document.querySelector('#locsList .add-loc-btn');
   let inserted = false;
   for (const el of locs) {
     const r = el.getBoundingClientRect();
-    if (touch.clientY < r.top + r.height / 2) {
+    if (clientY < r.top + r.height / 2) {
       document.getElementById('locsList').insertBefore(drag.accEl, el);
       inserted = true; break;
     }
@@ -738,31 +790,44 @@ function onDragMove(e) {
   if (!inserted && addBtn) document.getElementById('locsList').insertBefore(drag.accEl, addBtn);
 }
 
-function onDragEnd() {
+function _dragEnd() {
   if (!drag) return;
-  document.removeEventListener('touchmove', onDragMove);
-
   drag.ghost.remove();
   drag.accEl.classList.remove('dragging');
-
-  // Read new order from DOM
   const newOrder = Array.from(document.querySelectorAll('#locsList .loc-acc'))
     .map((el, idx) => ({ id: parseInt(el.id.replace('la-', '')), sort_order: idx }));
-
-  // Update DATA order
   const orderMap = {};
   newOrder.forEach(o => orderMap[o.id] = o.sort_order);
   DATA.locations.sort((a, b) => (orderMap[a.id] ?? 99) - (orderMap[b.id] ?? 99));
-
   drag = null;
   render();
-
   fetch('/api/locations/reorder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(newOrder),
   }).catch(() => toast('排序儲存失敗', 'err'));
 }
+
+// Touch handlers
+function onDragHandleTouch(e, locId) {
+  if (e.touches.length !== 1) return;
+  e.preventDefault(); e.stopPropagation();
+  _dragStart(e.touches[0].clientX, e.touches[0].clientY, locId);
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('touchend', onDragEnd, { once: true });
+}
+function onDragMove(e) { if (!drag) return; e.preventDefault(); _dragMove(e.touches[0].clientY); }
+function onDragEnd()   { document.removeEventListener('touchmove', onDragMove); _dragEnd(); }
+
+// Mouse handlers (desktop)
+function onDragHandleMouse(e, locId) {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  _dragStart(e.clientX, e.clientY, locId);
+  document.addEventListener('mousemove', onDragMoveMouse);
+  document.addEventListener('mouseup',   onDragEndMouse, { once: true });
+}
+function onDragMoveMouse(e) { _dragMove(e.clientY); }
+function onDragEndMouse()   { document.removeEventListener('mousemove', onDragMoveMouse); _dragEnd(); }
 
 // ── Accordion ─────────────────────────────────────────────────
 function toggleLoc(id) {
@@ -888,7 +953,7 @@ function toggleVoice() { isRec ? stopVoice() : startVoice(); }
 function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { toast('請用 Chrome 或 Edge','err'); return; }
-  recog = new SR(); recog.lang = 'zh-TW'; recog.continuous = false; recog.interimResults = true;
+  recog = new SR(); recog.lang = 'zh-TW'; recog.continuous = true; recog.interimResults = true;
   recog.onstart  = () => { isRec=true; voiceBtn.classList.add('rec'); voiceBtn.textContent='⏹'; setVS('🔴 錄音中⋯'); };
   recog.onresult = e => { let t=''; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('voiceText').value=t; };
   recog.onend    = () => { isRec=false; voiceBtn.classList.remove('rec'); voiceBtn.textContent='🎤'; setVS('✅ 完成，按「解析文字」繼續'); };

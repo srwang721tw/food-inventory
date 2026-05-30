@@ -16,7 +16,7 @@ _FOOD_UNITS = [
     '公升', '毫升', '公克', '公斤',                          # multi-char first
     '瓶', '罐', '個', '包', '盒', '袋', '條', '片', '塊', '份',
     '顆', '粒', '串', '把', '支', '箱', '桶', '升', '克', '斤',
-    '兩', '杯', '碗', '匙',
+    '兩', '杯', '碗', '匙', '根', '隻', '尾', '束', '株',
     'kg', 'ml', 'g', 'L',
 ]
 UNIT_RE = '|'.join(re.escape(u) for u in _FOOD_UNITS)
@@ -310,20 +310,38 @@ def _split_items(text: str) -> list:
         if qty_re.search(left) and qty_re.search(right):
             return [left, right]
 
-    # 4. Implicit boundary: items start with NUM+FOOD_UNIT.
-    #    Exclude "個" followed by time words (e.g. 兩個禮拜, 三個月).
+    # 4. Implicit boundary: split on NUM+FOOD_UNIT occurrences.
+    #    Two modes depending on whether items lead with qty or food name:
+    #      • qty-first  ("一包水蓮三包堅果")  → split BEFORE each NUM+UNIT
+    #      • name-first ("蕃茄三顆絲瓜一條") → split AFTER  each NUM+UNIT;
+    #        trailing non-food text ("這些大概都是一個禮拜到期") is discarded
+    #        here and handled as global context in parse_multiple_foods.
     boundary_re = re.compile(
         rf'{_NUM_RE}\s*({UNIT_RE})(?!\s*(?:禮拜|週|周|月|年|天|日))'
     )
     matches = list(boundary_re.finditer(text))
     if len(matches) > 1:
-        splits = [m.start() for m in matches]
         parts = []
-        for i, start in enumerate(splits):
-            end = splits[i + 1] if i + 1 < len(splits) else len(text)
-            part = text[start:end].strip()
-            if part:
-                parts.append(part)
+        if matches[0].start() == 0:
+            # qty-first: split before each NUM+UNIT (original behaviour)
+            splits = [m.start() for m in matches]
+            for i, start in enumerate(splits):
+                end = splits[i + 1] if i + 1 < len(splits) else len(text)
+                part = text[start:end].strip()
+                if part:
+                    parts.append(part)
+        else:
+            # name-first: split after each NUM+UNIT
+            prev = 0
+            for m in matches:
+                part = text[prev:m.end()].strip()
+                if part:
+                    parts.append(part)
+                prev = m.end()
+            tail = text[prev:].strip()
+            # Keep tail only if it contains its own food unit (not just global context)
+            if tail and boundary_re.search(tail):
+                parts.append(tail)
         if len(parts) > 1:
             return parts
 
@@ -366,6 +384,12 @@ def parse_multiple_foods(text: str) -> list:
             global_ctx['location_hint'] = hint
             break
 
+    # Extract global expiry from the full text (e.g. trailing "這些大概都是一個禮拜到期")
+    # Individual segments produced by name-first splitting won't contain it.
+    _full = parse_food_text(text)
+    if _full.get('expiry_date'):
+        global_ctx['expiry_date'] = _full['expiry_date']
+
     # ── Split & parse each segment ────────────────────────────────
     segments = _split_items(text)
     results  = []
@@ -376,6 +400,8 @@ def parse_multiple_foods(text: str) -> list:
             item['purchase_date'] = global_ctx['purchase_date']
         if item['location_hint'] is None and 'location_hint' in global_ctx:
             item['location_hint'] = global_ctx['location_hint']
+        if item['expiry_date'] is None and 'expiry_date' in global_ctx:
+            item['expiry_date'] = global_ctx['expiry_date']
         if item['name'] and item['name'] != '未知食物':
             results.append(item)
 

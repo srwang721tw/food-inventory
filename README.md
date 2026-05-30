@@ -13,8 +13,8 @@ A mobile-first web app for tracking household food inventory. Describe newly pur
 | **Voice / text input** | Speak or type e.g. "三包泡麵一個月後到期" — name, quantity, and expiry are parsed automatically |
 | **Batch NLP parsing** | One sentence can describe multiple items; review and edit each before saving |
 | **Expiry color coding** | Red (expired / ≤3 days), orange (≤7 days), green (safe), grey (no expiry set) |
-| **Swipe to delete** | Swipe an item row left to reveal a delete button; tap once to remove |
-| **Drag to reorder** | Long-press the ≡ handle on a location to drag it to a new position |
+| **Swipe to delete** | On mobile: swipe an item row left to reveal a delete button. On desktop: trash icon appears on hover |
+| **Drag to reorder** | Drag the ≡ handle on a location — works with both touch and mouse |
 | **Stats quick-filter** | Tap "已過期" or "快過期" to expand all matching locations; tap again to collapse |
 | **Dark / light mode** | Toggle in the top-right corner: system default 🌓 → light ☀️ → dark 🌙 |
 | **Responsive layout** | Optimised for portrait and landscape on mobile |
@@ -24,6 +24,7 @@ A mobile-first web app for tracking household food inventory. Describe newly pur
 ```
 一瓶豆漿三天後到期、三包泡麵一個月後到期
 雞胸肉500克明天到期還有花椰菜一顆五天後到期
+蕃茄三顆絲瓜一條水蓮三包金針菇四包這些大概都是一個禮拜到期
 一包水蓮大約兩個禮拜內到期一罐可樂沒有期限
 有效期限到2026/7/1
 今天買了牛奶放冰箱

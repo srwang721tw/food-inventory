@@ -68,6 +68,8 @@ Entry points：
 
 - **Regex 順序：** pattern 採用 first-match-wins。有前綴的 pattern（`保存N週`、`可以放N天`）**必須放在** 無前綴版本（`N週`、`N天`）之前。若通用 pattern 先 match，只會 mask 數字+單位，留下前綴（如「保存」）污染食物名稱。
 - **`_split_items()` 的 connector guard：** `還有`/`另外`/`以及` 連接詞用於分割多項食物，但當右側是純時間表達式（如「還有五天到期」）時**不應分割**，否則會把一項食物拆成兩項。
+- **`_split_items()` 的雙模式分割（rule 4）：** 若 NUM+UNIT 出現在句首（數量先於食物名），在每個 NUM+UNIT **之前**分割；若食物名稱在前（如「蕃茄三顆絲瓜一條」），在 NUM+UNIT **之後**分割，尾部非食物的文字（如「這些大概都是一個禮拜到期」）視為全局 context 丟棄。
+- **全局到期日傳播：** `parse_multiple_foods` 在分割前先對完整文字呼叫 `parse_food_text` 取得全局 `expiry_date`，再傳播給沒有個別到期日的各項目。
 
 ### JS 注意事項
 
@@ -80,8 +82,10 @@ Entry points：
 - 所有 mutation 為樂觀更新：先更新 `DATA` → `render()` → 顯示 toast（無整頁重新載入）
 - 食物排序規則：到期日最近優先，無到期日的排最後，同到期日按名稱排序
 - 到期色碼：紅（已過期或 ≤3 天）、橘（≤7 天）、綠（>7 天）
-- 左滑刪除：刪除鍵以 `position: absolute; right: -76px` 放在 card 內部，跟著 card transform 移動；`overflow: hidden` 保證初始隱藏
-- 拖拉排序：≡ handle 的 touchstart 觸發，建立 ghost clone，排序結果 POST 到 `/api/locations/reorder`
+- 左滑刪除（手機）：刪除鍵以 `position: absolute; right: -76px` 放在 card 內部，跟著 card transform 移動；`overflow: hidden` 保證初始隱藏。電腦版改為 hover 時顯示垃圾桶圖示
+- 拖拉排序：≡ handle 同時綁定 `touchstart`（手機）和 `mousedown`（電腦），共用 `_dragStart / _dragMove / _dragEnd` 邏輯，建立 ghost clone，排序結果 POST 到 `/api/locations/reorder`
+- 點擊目標：只有 `.item-emoji` 和 `.item-info` 有 `onclick="openEditItem(...)"`，其餘區域（badge、空白）不觸發編輯。手機左滑後 touchend 會 `e.preventDefault()` 阻止 click 事件
+- 語音輸入：`recog.continuous = true`，持續錄音直到使用者手動按停止
 
 ### 環境變數
 
