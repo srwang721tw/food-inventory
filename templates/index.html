@@ -250,6 +250,8 @@
       color: var(--text); background: var(--bg); outline: none;
       transition: border-color 0.14s, background 0.2s, color 0.2s;
     }
+    /* iOS Safari sets an intrinsic min-width on date inputs — override it */
+    .fg input[type="date"] { min-width: 0; max-width: 100%; }
     .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--primary); }
     .fg textarea { resize: none; min-height: 62px; line-height: 1.5; }
     .fg input::placeholder, .fg textarea::placeholder { color: var(--text3); }
