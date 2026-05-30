@@ -110,6 +110,7 @@
     .sc.d .n { color: var(--danger); }
     .sc.w .n { color: var(--warn); }
     .sc.g .n { color: var(--ok); }
+    .sc.active { outline: 2.5px solid var(--primary); outline-offset: -2px; }
 
     /* ── Accordion ── */
     .locs { padding: 4px 16px 100px; display: flex; flex-direction: column; gap: 10px; }
@@ -152,16 +153,17 @@
 
     /* ── Swipe wrapper ── */
     .swipe-wrap {
-      position: relative; overflow: hidden;
+      overflow: hidden;
       border-bottom: 1px solid rgba(229,229,234,0.5);
     }
     .swipe-wrap:last-child { border-bottom: none; }
+    /* del button lives INSIDE the card at right:-76px, so it moves with the card */
     .swipe-del {
-      position: absolute; right: 0; top: 0; bottom: 0;
-      width: var(--del-w); background: var(--danger);
-      color: #fff; border: none; font-size: 13px; font-weight: 600;
+      position: absolute; right: calc(-1 * var(--del-w)); top: 0; bottom: 0;
+      width: var(--del-w); background: var(--danger); color: #fff;
+      border: none; font-size: 13px; font-weight: 600;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      gap: 3px; flex-direction: column; flex-shrink: 0;
+      gap: 3px; flex-direction: column;
     }
     .swipe-del .del-icon { font-size: 18px; }
 
@@ -169,8 +171,8 @@
       display: flex; align-items: center; gap: 11px;
       padding: 11px 14px 11px 20px;
       cursor: pointer; background: var(--card);
-      position: relative; will-change: transform;
-      transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
+      position: relative; overflow: visible;
+      transition: transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94);
     }
     .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
     .item-card.sd::before { background: var(--danger); }
@@ -503,6 +505,8 @@ function render() {
   renderLocs();
 }
 
+let activeFilter = null;
+
 function renderSummary() {
   let exp = 0, warn = 0, total = 0;
   for (const l of DATA.locations) {
@@ -513,13 +517,23 @@ function renderSummary() {
       if (d < 0) exp++; else if (d <= 7) warn++;
     }
   }
+  const a = activeFilter;
   document.getElementById('gSummary').innerHTML =
-    `<div class="sc ${exp?'d':'g'}" onclick="filterByStatus('d')"><div class="n">${exp}</div><div class="l">已過期</div></div>
-     <div class="sc ${warn?'w':'g'}" onclick="filterByStatus('w')"><div class="n">${warn}</div><div class="l">快過期</div></div>
-     <div class="sc g" onclick="filterByStatus('all')"><div class="n">${total}</div><div class="l">總食物數</div></div>`;
+    `<div class="sc ${exp?'d':'g'}${a==='d'?' active':''}" onclick="filterByStatus('d')"><div class="n">${exp}</div><div class="l">已過期</div></div>
+     <div class="sc ${warn?'w':'g'}${a==='w'?' active':''}" onclick="filterByStatus('w')"><div class="n">${warn}</div><div class="l">快過期</div></div>
+     <div class="sc g${a==='all'?' active':''}" onclick="filterByStatus('all')"><div class="n">${total}</div><div class="l">總食物數</div></div>`;
 }
 
 function filterByStatus(type) {
+  closeAllSwipes('');
+  if (activeFilter === type) {
+    // Second tap on same button → collapse all & clear filter
+    activeFilter = null;
+    DATA.locations.forEach(l => { l._open = false; });
+    render();
+    return;
+  }
+  activeFilter = type;
   if (type === 'all') {
     DATA.locations.forEach(l => { l._open = true; });
   } else {
@@ -534,7 +548,6 @@ function filterByStatus(type) {
     });
   }
   render();
-  // Scroll to first matching location
   requestAnimationFrame(() => {
     const first = document.querySelector('.loc-items.open');
     if (first) first.closest('.loc-acc').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -558,8 +571,9 @@ function renderLocs() {
 
   // Bind swipe on item cards
   document.querySelectorAll('.swipe-wrap').forEach(wrap => {
-    const card = wrap.querySelector('.item-card');
-    if (card) initSwipe(wrap, card);
+    const card   = wrap.querySelector('.item-card');
+    const itemId = parseInt(wrap.id.replace('sw-', ''));
+    if (card) initSwipe(wrap, card, itemId);
   });
 }
 
@@ -599,23 +613,21 @@ function itemHTML(item) {
   const qty = item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1);
   return `
   <div class="swipe-wrap" id="sw-${item.id}">
-    <div class="item-card s${st}" id="ic-${item.id}" onclick="openEditItem(${item.id})">
+    <div class="item-card s${st}" id="ic-${item.id}">
       <div class="item-emoji">${item.emoji||'🍱'}</div>
       <div class="item-info">
         <div class="item-name">${item.name}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span></div>
         <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
       </div>
       ${badge}
+      <button class="swipe-del" onclick="event.stopPropagation();swipeDelete(${item.id})">
+        <span class="del-icon">🗑</span>刪除
+      </button>
     </div>
-    <button class="swipe-del" onclick="swipeDelete(${item.id})">
-      <span class="del-icon">🗑</span>刪除
-    </button>
   </div>`;
 }
 
 // ── Swipe to delete ───────────────────────────────────────────
-let activeSwipe = null;
-
 function closeAllSwipes(exceptId) {
   document.querySelectorAll('.swipe-wrap').forEach(w => {
     if (w.id !== exceptId) {
@@ -625,34 +637,42 @@ function closeAllSwipes(exceptId) {
   });
 }
 
-function initSwipe(wrap, card) {
-  let startX = 0, startY = 0, dx = 0, isSwiping = false;
+function initSwipe(wrap, card, itemId) {
+  let sx = 0, sy = 0, dx = 0, moved = false, startOffset = 0;
 
   card.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    dx = 0; isSwiping = false;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    dx = 0; moved = false;
+    const m = (card.style.transform || '').match(/translateX\((-?[\d.]+)px\)/);
+    startOffset = m ? parseFloat(m[1]) : 0;
     card.style.transition = 'none';
   }, { passive: true });
 
   card.addEventListener('touchmove', e => {
     if (e.touches.length !== 1) return;
-    dx = e.touches[0].clientX - startX;
-    const dy = Math.abs(e.touches[0].clientY - startY);
-    if (!isSwiping && Math.abs(dx) < 5 && dy < 5) return;
-    if (!isSwiping && dy > Math.abs(dx)) return; // vertical scroll, ignore
-    isSwiping = true;
-    if (dx > 0) dx = 0; // no right swipe
-    const clamped = Math.max(dx, -76);
-    card.style.transform = `translateX(${clamped}px)`;
+    dx = e.touches[0].clientX - sx;
+    const dy = Math.abs(e.touches[0].clientY - sy);
+    if (!moved && Math.abs(dx) < 5 && dy < 5) return;
+    if (!moved && dy > Math.abs(dx)) return; // vertical scroll — ignore
+    moved = true;
+    const next = Math.max(Math.min(startOffset + dx, 0), -76);
+    card.style.transform = `translateX(${next}px)`;
     e.preventDefault();
   }, { passive: false });
 
   card.addEventListener('touchend', () => {
     card.style.transition = '';
-    if (dx < -38) {
-      card.style.transform = `translateX(-${76}px)`;
+    const finalX = startOffset + dx;
+    if (!moved) {
+      if (startOffset < -10) {
+        card.style.transform = ''; // tap on open card → close
+      } else {
+        openEditItem(itemId);
+      }
+    } else if (finalX < -38) {
+      card.style.transform = 'translateX(-76px)';
       closeAllSwipes(wrap.id);
     } else {
       card.style.transform = '';
@@ -661,13 +681,10 @@ function initSwipe(wrap, card) {
 }
 
 function swipeDelete(itemId) {
-  // Remove from DATA
-  let locFound = null;
   for (const loc of DATA.locations) {
     const idx = loc.items.findIndex(i => i.id === itemId);
-    if (idx !== -1) { locFound = loc; loc.items.splice(idx, 1); break; }
+    if (idx !== -1) { loc.items.splice(idx, 1); break; }
   }
-  // Animate out
   const wrap = document.getElementById('sw-' + itemId);
   if (wrap) { wrap.style.transition = 'opacity 0.15s'; wrap.style.opacity = '0'; }
   setTimeout(() => { render(); toast('已刪除'); }, 150);
@@ -749,8 +766,8 @@ function onDragEnd() {
 
 // ── Accordion ─────────────────────────────────────────────────
 function toggleLoc(id) {
-  // Close open swipes first
   closeAllSwipes('');
+  activeFilter = null; // manual interaction clears the filter highlight
   const loc = DATA.locations.find(l => l.id === id);
   if (loc) loc._open = !loc._open;
   renderLocs();
