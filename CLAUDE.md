@@ -2,87 +2,91 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Deployment
+## 部署資訊
 
-- **Production:** https://food-inventory-4ygl.onrender.com (Render free tier — **not** Railway, despite `railway.toml` being present)
-- **GitHub:** https://github.com/srwang721tw/food-inventory
-- Production MUST use `DATABASE_URL` env var pointing to Render PostgreSQL — Render's filesystem is ephemeral and SQLite data is wiped on every redeploy.
+- **Production：** https://food-inventory-4ygl.onrender.com（Render 免費方案；儘管 `railway.toml` 存在，實際部署在 **Render**，不在 Railway）
+- **GitHub：** https://github.com/srwang721tw/food-inventory
+- 生產環境**必須**設定 `DATABASE_URL` 指向 Neon PostgreSQL。Render 的 filesystem 是 ephemeral，SQLite 資料每次重新部署都會清空。
 
-## Commands
+## 指令
 
 ```bash
-# Activate virtualenv (required before running anything)
+# 啟動虛擬環境（必要）
 source .venv/bin/activate
 
-# Run dev server (use port 5001 to avoid conflicts)
+# 啟動開發伺服器（用 5001 避免與系統衝突）
 PORT=5001 python app.py
 
-# Install dependencies
+# 安裝依賴
 pip install -r requirements.txt
 
-# Production server (used on Railway)
+# 生產伺服器（Render 使用）
 gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 
-There are no tests in this project.
+此專案**無測試**。
 
-**Zero-cost constraint:** The entire system must run at zero ongoing cost. Never suggest paid APIs (Claude API, OpenAI, Google STT, etc.). If NLP needs improvement, extend `nlp.py` with more regex rules.
+**零費用原則：** 整個系統不得產生任何持續費用。禁止建議使用付費 API（Claude API、OpenAI、Google STT 等）。NLP 需要改進時，請擴充 `nlp.py` 的 regex 規則。
 
-## Architecture
+## 架構說明
 
-This is a mobile-first family food inventory web app (家庭共享食物庫存系統). The stack is Flask + SQLAlchemy + vanilla JS with no build step.
+這是一個以手機操作為主的家庭食物庫存 Web App。技術棧為 Flask + SQLAlchemy + Vanilla JS，無建置步驟。
 
-### Backend (`app.py`)
+### 後端（`app.py`）
 
-Two SQLAlchemy models:
-- **`Location`** — a storage place (e.g. 冰箱, 冷凍庫, 乾貨櫃). Has many `Item`s with cascade delete.
-- **`Item`** — a food item with name, emoji, quantity, unit, purchase_date, expiry_date, notes, and a FK to Location.
+兩個 SQLAlchemy Model：
+- **`Location`**：存放地點（如冰箱、冷凍庫）。有多個 `Item`，cascade delete。
+- **`Item`**：食物項目，欄位有 name、emoji、quantity、unit、purchase_date、expiry_date、notes、FK 指向 Location。
 
-Routes:
-- `GET /` — renders `index.html` with all locations+items serialized as `data_json` (a JSON blob injected into the template)
-- `GET /location/<id>` — renders `location.html` with items and all locations serialized as separate JSON blobs
-- `GET /health` — health check for Railway
-- REST API: `GET|POST /api/locations`, `PUT|DELETE /api/locations/<id>`, `GET|PUT|DELETE /api/items/<id>`, `POST /api/items`, `POST /api/items/batch`, `POST /api/parse`
+路由：
+- `GET /` — 渲染 `index.html`，將所有地點+食物序列化為 `data_json` 注入 `<script>` 中
+- `GET /location/<id>` — 渲染 `location.html`（legacy，目前未使用）
+- `GET /health` — Render healthcheck
+- REST API：`GET|POST /api/locations`、`PUT|DELETE /api/locations/<id>`、`POST /api/locations/reorder`、`GET|PUT|DELETE /api/items/<id>`、`POST /api/items`、`POST /api/items/batch`、`POST /api/parse`
 
-Database: SQLite locally (`instance/food_inventory.db`); PostgreSQL on Railway via `DATABASE_URL` env var. Schema migrations are done inline at startup (currently adds the `emoji` column if missing).
+資料庫：本地用 SQLite（`instance/food_inventory.db`）；生產用 Neon PostgreSQL（`DATABASE_URL` 環境變數）。Schema migration 在啟動時 inline 執行（目前會補上 `emoji` 和 `sort_order` 欄位）。
 
-### NLP module (`nlp.py`)
+### NLP 模組（`nlp.py`）
 
-Rule-based Chinese food text parser — no external API, no cost. Uses `jieba` for segmentation and `regex` for date/quantity extraction. Entry points:
-- `parse_food_text(text)` → single item dict
-- `parse_multiple_foods(text)` → list of item dicts (handles sentences with multiple items via `_split_items`)
+純本地的中文食物文字解析器，使用 jieba 分詞 + regex 抽取日期/數量。不呼叫任何外部 API。
 
-Extracted fields: `name`, `quantity`, `unit`, `purchase_date`, `expiry_date`, `location_hint`. Date parsing supports absolute dates (YYYY年M月D日, YYYY/M/D), relative days/weeks/months, and natural phrases (昨天, 下週, 三天後到期, etc.).
+Entry points：
+- `parse_food_text(text)` → 單一 item dict
+- `parse_multiple_foods(text)` → item dict 列表（透過 `_split_items` 處理多項）
 
-### Frontend (templates/)
+解析欄位：`name`、`quantity`、`unit`、`purchase_date`、`expiry_date`、`location_hint`。日期支援絕對日期（YYYY年M月D日、YYYY/M/D）、相對天數/週/月、自然語言片語（昨天、下週、三天後到期等）。
 
-**`base.html`** — shared CSS design system (CSS variables, sheet/overlay, form, button, toast, emoji grid, voice button components) and shared JS (`toast()`, `showSheet()`, `hideSheet()`). Extended by `location.html`.
+### 前端（templates/）
 
-**`index.html`** — standalone SPA (does **not** extend `base.html`, has its own inline styles). Renders an accordion list of locations; each accordion row contains item cards. All state lives in a `DATA` object populated from the server-rendered `data_json`. Mutations go through fetch calls to the REST API, then update `DATA` in place and call `render()`. Sheets (bottom drawers) handle add/edit/delete for items and locations.
+**`base.html`** — 共用 CSS 設計系統（CSS 變數、Sheet/Overlay、表單、按鈕、Toast、Emoji grid、語音按鈕）與共用 JS（`toast()`、`showSheet()`、`hideSheet()`）。由 `location.html` 繼承。
 
-**`location.html`** — legacy per-location detail view (extends `base.html`). Currently unused — the accordion SPA in `index.html` replaced it. Keep but don't maintain.
+**`index.html`** — 獨立 SPA（**不**繼承 `base.html`，自帶 inline 樣式）。渲染地點 accordion 列表，每個 accordion 內含食物卡片。所有狀態存在 `DATA` 物件（由 server-rendered `data_json` 初始化）。Mutation 流程：call API → 更新 `DATA` → 呼叫 `render()` → 顯示 toast（無整頁重新載入）。
 
-### NLP pitfalls
+**`location.html`** — legacy 地點詳細頁面（繼承 `base.html`）。目前未使用，被 `index.html` 的 accordion SPA 取代。保留但不維護。
 
-- **Pattern ordering in `nlp.py`:** Regex patterns are tried first-match-wins. Prefixed patterns (`保存N週`, `可以放N天`) MUST come before their bare equivalents (`N週`, `N天`). If a general pattern fires first, it only masks the number+unit and leaves the prefix (e.g., "保存") unmasked, which bleeds into the extracted food name.
-- **`_split_items()` connector guard:** The `還有`/`另外`/`以及` connectors split a sentence into multiple items, but only when the right side is NOT a pure time expression (e.g., "還有五天到期" should NOT split — it's one item's expiry, not a second item).
+### NLP 注意事項
 
-### JS pitfalls
+- **Regex 順序：** pattern 採用 first-match-wins。有前綴的 pattern（`保存N週`、`可以放N天`）**必須放在** 無前綴版本（`N週`、`N天`）之前。若通用 pattern 先 match，只會 mask 數字+單位，留下前綴（如「保存」）污染食物名稱。
+- **`_split_items()` 的 connector guard：** `還有`/`另外`/`以及` 連接詞用於分割多項食物，但當右側是純時間表達式（如「還有五天到期」）時**不應分割**，否則會把一項食物拆成兩項。
 
-- **Dangling event listeners:** Removing an HTML element without removing its corresponding `document.querySelector(...).addEventListener(...)` throws `TypeError: Cannot read properties of null` at top-level script scope, silently killing all JS and leaving the page blank/non-interactive. Always search for all JS references before deleting HTML elements.
+### JS 注意事項
 
-### UI patterns to preserve
+- **殘留的 event listener：** 移除 HTML 元素時，若對應的 `document.querySelector(...).addEventListener(...)` 沒有一併移除，會在頂層 script 拋出 `TypeError: Cannot read properties of null`，靜默中斷整個 JS 執行，導致頁面空白或無互動。移除 HTML 元素前，務必搜尋所有 JS 引用。
 
-- Mobile-first, max-width 430px, iOS-style aesthetic
-- `color-scheme: light` is forced to prevent dark-mode inversion
-- All mutations are optimistic: update `DATA` → call `render()` → show toast (no full page reloads)
-- Items are always sorted: soonest expiry first, no-expiry items last, then by name
-- Status colors: danger (red) = expired or ≤3 days; warn (orange) = ≤7 days; ok (green) = >7 days
+### UI 設計規範
 
-### Environment variables
+- 以手機操作為主，max-width 430px（橫式放寬至 700px），iOS 風格設計
+- 深色/淺色/系統三段切換；`html.dark` class 控制 CSS 變數
+- 所有 mutation 為樂觀更新：先更新 `DATA` → `render()` → 顯示 toast（無整頁重新載入）
+- 食物排序規則：到期日最近優先，無到期日的排最後，同到期日按名稱排序
+- 到期色碼：紅（已過期或 ≤3 天）、橘（≤7 天）、綠（>7 天）
+- 左滑刪除：刪除鍵以 `position: absolute; right: -76px` 放在 card 內部，跟著 card transform 移動；`overflow: hidden` 保證初始隱藏
+- 拖拉排序：≡ handle 的 touchstart 觸發，建立 ghost clone，排序結果 POST 到 `/api/locations/reorder`
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL URL (Railway). Falls back to SQLite if absent. |
-| `SECRET_KEY` | Flask secret key |
-| `PORT` | Server port (default 5000) |
+### 環境變數
+
+| 變數 | 說明 |
+|------|------|
+| `DATABASE_URL` | Neon PostgreSQL 連線字串。不設定時退回 SQLite（僅限本地開發）。 |
+| `SECRET_KEY` | Flask session 金鑰 |
+| `PORT` | 伺服器 port（預設 5000；本地建議用 5001） |

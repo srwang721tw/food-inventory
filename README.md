@@ -1,25 +1,25 @@
-# 🏠 王李夫妻共享食物庫存系統
+# Food Inventory
 
-家庭食物庫存管理 App，用口語描述剛買的食物，自動解析並追蹤到期日。
+A mobile-first web app for tracking household food inventory. Describe newly purchased items in natural Chinese (typed or spoken), and the app automatically parses names, quantities, and expiry dates.
 
-**Production：** https://food-inventory-4ygl.onrender.com
+**Production:** https://food-inventory-4ygl.onrender.com
 
 ---
 
-## 功能
+## Features
 
-| 功能 | 說明 |
-|------|------|
-| **語音 / 文字輸入** | 說出或打入「三包泡麵一個月後到期」，自動解析名稱、數量、到期日 |
-| **批次 NLP 解析** | 一句話可同時描述多項食物，解析後可手動調整再確認 |
-| **到期色碼** | 紅（已過期 / ≤3天）、橘（≤7天）、綠（安全）、灰（無到期日） |
-| **左滑刪除** | 對食物列左滑，右側出現刪除鍵，直接點擊刪除 |
-| **拖拉排序** | 長按地點左側 ≡ 拖拉調整存放地點順序 |
-| **統計快篩** | 點上方「已過期」或「快過期」自動展開相關地點；再點一次收折 |
-| **深色模式** | 右上角按鈕循環切換：跟隨系統 🌓 → 淺色 ☀️ → 深色 🌙 |
-| **RWD** | 直式 / 橫式自適應，以手機操作為主 |
+| Feature | Description |
+|---------|-------------|
+| **Voice / text input** | Speak or type e.g. "三包泡麵一個月後到期" — name, quantity, and expiry are parsed automatically |
+| **Batch NLP parsing** | One sentence can describe multiple items; review and edit each before saving |
+| **Expiry color coding** | Red (expired / ≤3 days), orange (≤7 days), green (safe), grey (no expiry set) |
+| **Swipe to delete** | Swipe an item row left to reveal a delete button; tap once to remove |
+| **Drag to reorder** | Long-press the ≡ handle on a location to drag it to a new position |
+| **Stats quick-filter** | Tap "已過期" or "快過期" to expand all matching locations; tap again to collapse |
+| **Dark / light mode** | Toggle in the top-right corner: system default 🌓 → light ☀️ → dark 🌙 |
+| **Responsive layout** | Optimised for portrait and landscape on mobile |
 
-### NLP 支援的輸入格式
+### Supported NLP input patterns
 
 ```
 一瓶豆漿三天後到期、三包泡麵一個月後到期
@@ -31,67 +31,66 @@
 
 ---
 
-## 技術棧
+## Tech stack
 
-| 層次 | 選擇 |
-|------|------|
-| 後端 | Python 3.12 + Flask 3.1 |
+| Layer | Choice |
+|-------|--------|
+| Backend | Python 3.12 + Flask 3.1 |
 | ORM | Flask-SQLAlchemy 3.1 |
-| 資料庫 | SQLite（本地）/ PostgreSQL（生產） |
-| NLP | jieba + regex（本地，零費用，無 API 呼叫） |
-| 語音辨識 | Web Speech API（瀏覽器原生，Chrome / Edge） |
-| 前端 | Vanilla JS + CSS（無框架，無建置步驟） |
-| 部署 | Render（Web Service + Neon PostgreSQL） |
+| Database | SQLite (local dev) / PostgreSQL (production) |
+| NLP | jieba + regex — local, zero cost, no API calls |
+| Voice | Web Speech API (browser-native; Chrome / Edge only) |
+| Frontend | Vanilla JS + CSS — no framework, no build step |
+| Hosting | Render (web service) + Neon (PostgreSQL) |
 
 ---
 
-## 本地開發
+## Local development
 
 ```bash
-# 1. 啟動虛擬環境
+# Activate the virtual environment
 source .venv/bin/activate
 
-# 2. 安裝依賴
+# Install dependencies
 pip install -r requirements.txt
 
-# 3. 啟動伺服器（port 5001 避免與系統服務衝突）
+# Start the dev server (port 5001)
 PORT=5001 python app.py
 ```
 
-開啟 http://localhost:5001
+Open http://localhost:5001
 
 ---
 
-## 部署（Render + Neon）
+## Deployment (Render + Neon)
 
-### Neon 資料庫
+### Neon database
 
-1. 前往 [neon.tech](https://neon.tech) 建立 Project（Region: Singapore）
-2. 複製 Connection String：`postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
+1. Create a project at [neon.tech](https://neon.tech) (region: Singapore)
+2. Copy the connection string: `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
 
-### Render
+### Render environment variables
 
-1. 進入 Service → **Environment**
-2. 設定以下環境變數：
+Go to your Render service → **Environment** and set:
 
-| 變數 | 值 |
-|------|----|
-| `DATABASE_URL` | Neon Connection String |
-| `SECRET_KEY` | 任意隨機字串 |
+| Variable | Value |
+|----------|-------|
+| `DATABASE_URL` | Neon connection string |
+| `SECRET_KEY` | Any random string |
 
-3. 儲存後 Render 自動重新部署；Flask 啟動時自動建立所有 table。
+Render redeploys automatically on save. Flask's `db.create_all()` creates all tables on first boot.
 
 ---
 
-## API
+## API reference
 
-| Endpoint | 說明 |
-|----------|------|
-| `GET /` | 主頁面（SSR，含完整資料 JSON） |
-| `GET/POST /api/locations` | 取得 / 新增地點 |
-| `PUT/DELETE /api/locations/<id>` | 編輯 / 刪除地點 |
-| `POST /api/locations/reorder` | 儲存地點排序 |
-| `POST /api/parse` | NLP 解析文字 → `List[item_dict]` |
-| `POST /api/items/batch` | 批次新增食物 |
-| `GET/PUT/DELETE /api/items/<id>` | 單筆食物操作 |
-| `GET /health` | Render healthcheck |
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Main page (SSR — full data JSON embedded) |
+| `GET / POST /api/locations` | List / create locations |
+| `PUT / DELETE /api/locations/<id>` | Update / delete a location |
+| `POST /api/locations/reorder` | Persist drag-to-reorder result |
+| `POST /api/parse` | NLP parse text → `List[item_dict]` |
+| `POST /api/items/batch` | Batch create items |
+| `GET / PUT / DELETE /api/items/<id>` | Single item operations |
+| `GET /health` | Render health check |
