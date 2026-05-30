@@ -3,76 +3,175 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="color-scheme" content="light">
-  <title>王氏夫妻家庭共享食物庫存系統</title>
+  <title>王李夫妻共享食物庫存系統</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
+    /* ── CSS Variables ── */
     :root {
-      --bg:         #f2f2f7;
-      --card:       #ffffff;
-      --primary:    #30b0c7;
-      --primary-d:  #e8f7fa;
-      --danger:     #ff3b30;
-      --danger-d:   #fff0ef;
-      --warn:       #ff9500;
-      --warn-d:     #fff8ed;
-      --ok:         #34c759;
-      --ok-d:       #edfbf1;
-      --text:       #1c1c1e;
-      --text2:      #636366;
-      --text3:      #aeaeb2;
-      --border:     #e5e5ea;
-      --shadow:     0 2px 14px rgba(0,0,0,0.07);
-      --radius:     16px;
-      --rsm:        10px;
+      --bg:        #f2f2f7;
+      --card:      #ffffff;
+      --header-bg: rgba(255,255,255,0.88);
+      --primary:   #30b0c7;
+      --primary-d: #e8f7fa;
+      --danger:    #ff3b30;
+      --danger-d:  #fff0ef;
+      --warn:      #ff9500;
+      --warn-d:    #fff8ed;
+      --ok:        #34c759;
+      --ok-d:      #edfbf1;
+      --text:      #1c1c1e;
+      --text2:     #636366;
+      --text3:     #aeaeb2;
+      --border:    #e5e5ea;
+      --shadow:    0 2px 14px rgba(0,0,0,0.07);
+      --radius:    16px;
+      --rsm:       10px;
+      --del-w:     76px;
     }
+    .dark {
+      --bg:        #1c1c1e;
+      --card:      #2c2c2e;
+      --header-bg: rgba(28,28,30,0.9);
+      --primary:   #30b0c7;
+      --primary-d: #0a3540;
+      --danger:    #ff453a;
+      --danger-d:  #2c1411;
+      --warn:      #ff9f0a;
+      --warn-d:    #2c2010;
+      --ok:        #30d158;
+      --ok-d:      #0d2a16;
+      --text:      #f2f2f7;
+      --text2:     rgba(235,235,245,0.6);
+      --text3:     rgba(235,235,245,0.3);
+      --border:    #38383a;
+      --shadow:    0 2px 14px rgba(0,0,0,0.4);
+    }
+
+    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    body { font-family: 'Noto Sans TC', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; max-width: 430px; margin: 0 auto; overflow-x: hidden; }
+    html { color-scheme: light; }
+    html.dark { color-scheme: dark; }
+    body {
+      font-family: 'Noto Sans TC', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh;
+      /* RWD: 430px on portrait, wider on landscape */
+      max-width: min(430px, 100vw);
+      margin: 0 auto; overflow-x: hidden;
+      transition: background 0.2s, color 0.2s;
+    }
+    @media (orientation: landscape) {
+      body { max-width: min(700px, 100vw); }
+    }
 
-    /* ── HEADER ── */
-    .header { background: rgba(255,255,255,0.88); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 52px 18px 14px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+    /* ── Header ── */
+    .header {
+      background: var(--header-bg);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      padding: 52px 16px 12px;
+      position: sticky; top: 0; z-index: 100;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    @media (orientation: landscape) and (max-height: 500px) {
+      .header { padding: 10px 16px 8px; }
+    }
     .header-top { display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
     .header h1 span { color: var(--primary); }
+    @media (orientation: landscape) and (max-height: 500px) {
+      .header h1 { font-size: 18px; }
+    }
+    .theme-btn {
+      width: 34px; height: 34px; flex-shrink: 0;
+      background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 50%; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .theme-btn:active { opacity: 0.7; }
 
-    /* ── SUMMARY ── */
-    .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 14px 16px 8px; }
-    .sc { background: var(--card); border-radius: var(--rsm); padding: 11px; text-align: center; box-shadow: var(--shadow); }
+    /* ── Summary ── */
+    .summary {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px; padding: 12px 16px 6px;
+    }
+    .sc {
+      background: var(--card); border-radius: var(--rsm);
+      padding: 10px; text-align: center;
+      box-shadow: var(--shadow); cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+      user-select: none;
+    }
+    .sc:active { transform: scale(0.95); }
     .sc .n { font-size: 22px; font-weight: 700; }
     .sc .l { font-size: 11px; color: var(--text2); margin-top: 1px; }
-    .sc.d .n { color: var(--danger); } .sc.w .n { color: var(--warn); } .sc.g .n { color: var(--ok); }
+    .sc.d .n { color: var(--danger); }
+    .sc.w .n { color: var(--warn); }
+    .sc.g .n { color: var(--ok); }
 
-    /* ── ACCORDION ── */
+    /* ── Accordion ── */
     .locs { padding: 4px 16px 100px; display: flex; flex-direction: column; gap: 10px; }
-    .loc-acc { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-    .loc-head {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 14px 14px 16px; cursor: pointer; user-select: none;
+    @media (orientation: landscape) {
+      .locs { padding-bottom: 60px; }
     }
-    .loc-head:active { background: #fafafa; }
-    .loc-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
-    .loc-info { flex: 1; min-width: 0; }
-    .loc-name { font-size: 15px; font-weight: 600; }
-    .loc-cnt  { font-size: 12px; color: var(--text3); margin-top: 1px; }
-    .loc-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
-    .chevron { font-size: 20px; color: var(--text3); transition: transform 0.22s; line-height: 1; }
+
+    .loc-acc {
+      background: var(--card); border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .loc-acc.drag-over { box-shadow: 0 0 0 2px var(--primary); }
+
+    .loc-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 13px 12px 13px 8px;
+      cursor: pointer; user-select: none;
+    }
+    .loc-head:active { background: rgba(0,0,0,0.04); }
+    .drag-handle {
+      flex-shrink: 0; width: 26px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text3); font-size: 18px; touch-action: none; cursor: grab;
+    }
+    .drag-handle:active { cursor: grabbing; color: var(--text2); }
+    .loc-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+    .loc-info  { flex: 1; min-width: 0; }
+    .loc-name  { font-size: 15px; font-weight: 600; }
+    .loc-cnt   { font-size: 12px; color: var(--text3); margin-top: 1px; }
+    .loc-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .chevron   { font-size: 20px; color: var(--text3); transition: transform 0.22s; line-height: 1; }
     .chevron.open { transform: rotate(90deg); }
 
-    /* ── ITEM LIST INSIDE ACCORDION ── */
+    /* ── Item list ── */
     .loc-items { display: none; border-top: 1px solid var(--border); }
     .loc-items.open { display: block; animation: fadeSlide 0.18s ease; }
-    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-    .loc-empty { text-align: center; padding: 24px 16px; font-size: 13px; color: var(--text3); }
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .loc-empty { text-align: center; padding: 22px 16px; font-size: 13px; color: var(--text3); }
+
+    /* ── Swipe wrapper ── */
+    .swipe-wrap {
+      position: relative; overflow: hidden;
+      border-bottom: 1px solid rgba(229,229,234,0.5);
+    }
+    .swipe-wrap:last-child { border-bottom: none; }
+    .swipe-del {
+      position: absolute; right: 0; top: 0; bottom: 0;
+      width: var(--del-w); background: var(--danger);
+      color: #fff; border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 3px; flex-direction: column; flex-shrink: 0;
+    }
+    .swipe-del .del-icon { font-size: 18px; }
 
     .item-card {
       display: flex; align-items: center; gap: 11px;
       padding: 11px 14px 11px 20px;
-      border-bottom: 1px solid rgba(229,229,234,0.6);
-      cursor: pointer; transition: background 0.12s;
-      position: relative;
+      cursor: pointer; background: var(--card);
+      position: relative; will-change: transform;
+      transition: transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94);
     }
-    .item-card:last-child { border-bottom: none; }
-    .item-card:active { background: #f8f8f8; }
     .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
     .item-card.sd::before { background: var(--danger); }
     .item-card.sw::before { background: var(--warn); }
@@ -82,14 +181,14 @@
     .item-name  { font-size: 14px; font-weight: 600; }
     .item-meta  { font-size: 11px; color: var(--text2); margin-top: 2px; }
 
-    /* ── BADGES ── */
+    /* ── Badges ── */
     .badge { padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
     .bd { background: var(--danger-d); color: var(--danger); }
     .bw { background: var(--warn-d);   color: var(--warn); }
     .bg { background: var(--ok-d);     color: var(--ok); }
     .bn { background: var(--bg);       color: var(--text3); }
 
-    /* ── BUTTONS ── */
+    /* ── Buttons ── */
     .add-btn {
       width: 30px; height: 30px; flex-shrink: 0;
       background: var(--primary); border: none; border-radius: 50%;
@@ -107,19 +206,33 @@
     }
     .add-loc-btn:hover { border-color: var(--primary); color: var(--primary); }
 
-    /* ── OVERLAY / SHEET ── */
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: flex-end; }
+    /* ── Overlay / Sheet ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.38); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      z-index: 200; display: flex; align-items: flex-end;
+    }
     .overlay.hidden { display: none; }
-    .sheet { background: var(--card); border-radius: 24px 24px 0 0; padding: 0 18px 40px; width: 100%; max-height: 92vh; overflow-y: auto; animation: su 0.26s cubic-bezier(0.32,0.72,0,1); scrollbar-width: none; }
+    .sheet {
+      background: var(--card); border-radius: 24px 24px 0 0;
+      padding: 0 18px 40px; width: 100%; max-height: 92vh;
+      overflow-y: auto; animation: su 0.26s cubic-bezier(0.32,0.72,0,1);
+      scrollbar-width: none; transition: background 0.2s;
+    }
     .sheet::-webkit-scrollbar { display: none; }
     .handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 13px auto 16px; }
     .sheet h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
     @keyframes su { from { transform: translateY(100%); } }
 
-    /* ── FORM ── */
+    /* ── Form ── */
     .fg { margin-bottom: 13px; }
     .fg label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
-    .fg input, .fg select, .fg textarea { width: 100%; padding: 10px 12px; border-radius: var(--rsm); border: 1.5px solid var(--border); font-size: 14px; font-family: inherit; color: var(--text); background: var(--bg); outline: none; transition: border-color 0.14s; }
+    .fg input, .fg select, .fg textarea {
+      width: 100%; padding: 10px 12px; border-radius: var(--rsm);
+      border: 1.5px solid var(--border); font-size: 14px; font-family: inherit;
+      color: var(--text); background: var(--bg); outline: none;
+      transition: border-color 0.14s, background 0.2s, color 0.2s;
+    }
     .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--primary); }
     .fg textarea { resize: none; min-height: 62px; line-height: 1.5; }
     .fg input::placeholder, .fg textarea::placeholder { color: var(--text3); }
@@ -131,59 +244,77 @@
     .btn-c { background: var(--bg); color: var(--text2); }
     .btn-del { background: transparent; color: var(--danger); border: none; font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 0; font-family: inherit; }
 
-    /* ── VOICE BTN ── */
-    .voice-btn { width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%; background: var(--primary-d); border: 2px solid var(--primary); color: var(--primary); font-size: 1.15rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.16s; }
+    /* ── Voice ── */
+    .voice-btn {
+      width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%;
+      background: var(--primary-d); border: 2px solid var(--primary);
+      color: var(--primary); font-size: 1.15rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.16s;
+    }
     .voice-btn:hover { background: var(--primary); color: #fff; }
     .voice-btn.rec { background: var(--danger); border-color: var(--danger); color: #fff; animation: vp 1.2s ease-in-out infinite; }
     @keyframes vp { 0%,100%{ box-shadow: 0 0 0 0 rgba(255,59,48,.4); } 50%{ box-shadow: 0 0 0 10px rgba(255,59,48,0); } }
     .vrow { display: flex; gap: 10px; align-items: flex-start; }
     .vstatus { font-size: 12px; color: var(--text3); min-height: 15px; margin-top: 4px; }
 
-    /* ── STEP LABEL ── */
+    /* ── Step label ── */
     .slabel { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .1em; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
     .slabel::after { content: ''; flex: 1; height: 1px; background: var(--border); }
     .divider { height: 1px; background: var(--border); margin: 14px 0; }
 
-    /* ── PARSE BTN ── */
-    .parse-btn { width: 100%; padding: 12px; border: none; border-radius: var(--rsm); font-size: 14px; font-weight: 600; background: var(--primary); color: #fff; cursor: pointer; font-family: inherit; margin-top: 10px; transition: opacity .15s; }
+    /* ── Parse btn ── */
+    .parse-btn {
+      width: 100%; padding: 12px; border: none; border-radius: var(--rsm);
+      font-size: 14px; font-weight: 600; background: var(--primary); color: #fff;
+      cursor: pointer; font-family: inherit; margin-top: 10px; transition: opacity .15s;
+    }
     .parse-btn:disabled { opacity: .55; cursor: default; }
 
-    /* ── PREVIEW CARDS ── */
+    /* ── Preview cards ── */
     .preview-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
     .prev-card { background: var(--bg); border-radius: var(--rsm); overflow: hidden; border: 1px solid var(--border); }
     .prev-summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; user-select: none; }
     .prev-summary:active { opacity: .8; }
-    .prev-emoji { font-size: 24px; line-height: 1; }
-    .prev-info { flex: 1; min-width: 0; }
-    .prev-name { font-size: 14px; font-weight: 600; display: block; }
+    .prev-emoji  { font-size: 24px; line-height: 1; }
+    .prev-info   { flex: 1; min-width: 0; }
+    .prev-name   { font-size: 14px; font-weight: 600; display: block; }
     .prev-detail { font-size: 12px; color: var(--text2); display: block; margin-top: 1px; }
     .prev-edit-icon { font-size: 13px; color: var(--text3); }
     .prev-edit { padding: 10px 12px 12px; border-top: 1px solid var(--border); background: var(--card); }
 
-    /* ── EMOJI GRID ── */
+    /* ── Emoji grid ── */
     .egrid { display: grid; grid-template-columns: repeat(8,1fr); gap: 4px; margin-bottom: 12px; }
     .eopt { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 7px; cursor: pointer; transition: background .1s; }
     .eopt:active, .eopt.sel { background: var(--primary-d); }
 
-    /* ── QTY ROW ── */
+    /* ── Qty row ── */
     .qrow { display: flex; align-items: center; gap: 8px; }
-    .qbtn { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); font-size: 17px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .qbtn { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); color: var(--text); font-size: 17px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-family: inherit; }
     .qval { font-size: 15px; font-weight: 600; min-width: 24px; text-align: center; }
 
-    /* ── SPINNER ── */
+    /* ── Spinner ── */
     .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .55s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── TOAST ── */
+    /* ── Toast ── */
     #toasts { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; width: 90%; max-width: 370px; }
     .toast { background: rgba(30,30,32,.92); color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.2); animation: ti .18s ease; }
     .toast.err { background: rgba(255,59,48,.92); }
     @keyframes ti { from { transform: translateY(6px); opacity: 0; } }
 
-    /* ── EMPTY ── */
+    /* ── Empty ── */
     .empty { text-align: center; padding: 60px 20px; color: var(--text2); }
     .empty .ei { font-size: 50px; margin-bottom: 12px; }
     .empty p { font-size: 14px; color: var(--text3); }
+
+    /* ── Drag ghost ── */
+    .drag-ghost {
+      position: fixed; z-index: 999; pointer-events: none;
+      opacity: 0.88; border-radius: var(--radius);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+    }
+    .loc-acc.dragging { opacity: 0.3; }
   </style>
 </head>
 <body>
@@ -191,14 +322,15 @@
 <!-- Header -->
 <div class="header">
   <div class="header-top">
-    <h1>🏠 王氏夫妻<span>食物庫存</span></h1>
+    <h1>🏠 王李夫妻<span>食物庫存</span></h1>
+    <button class="theme-btn" id="themeBtn" onclick="cycleTheme()" title="切換主題"></button>
   </div>
 </div>
 
-<!-- Global summary -->
+<!-- Summary -->
 <div class="summary" id="gSummary"></div>
 
-<!-- Accordion list -->
+<!-- Location accordion list -->
 <div class="locs" id="locsList"></div>
 
 <div id="toasts"></div>
@@ -208,8 +340,6 @@
   <div class="sheet">
     <div class="handle"></div>
     <h2 id="inputTitle">新增食物</h2>
-
-    <!-- Step 1: voice/text -->
     <div id="inputStep">
       <div class="slabel">語音 / 文字輸入</div>
       <div class="vrow">
@@ -220,8 +350,6 @@
       <p id="vstatus" class="vstatus"></p>
       <button class="parse-btn" id="parseBtn" onclick="parseInput()">🔍 解析文字</button>
     </div>
-
-    <!-- Step 2: preview + edit -->
     <div id="previewStep" style="display:none">
       <div class="slabel">找到 <span id="prevCount">0</span> 項食物，可手動修改</div>
       <div class="preview-list" id="previewList"></div>
@@ -298,19 +426,38 @@
 </div>
 
 <script>
+// ── Theme ─────────────────────────────────────────────────────
+const THEMES = ['system','light','dark'];
+const ICONS  = { system:'🌓', light:'☀️', dark:'🌙' };
+let currentTheme = localStorage.getItem('theme') || 'system';
+
+function applyTheme(t) {
+  const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.getElementById('themeBtn').textContent = ICONS[t];
+}
+function cycleTheme() {
+  const idx = THEMES.indexOf(currentTheme);
+  currentTheme = THEMES[(idx + 1) % THEMES.length];
+  localStorage.setItem('theme', currentTheme);
+  applyTheme(currentTheme);
+}
+applyTheme(currentTheme);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (currentTheme === 'system') applyTheme('system');
+});
+
 // ── Data ──────────────────────────────────────────────────────
 let DATA = {{ data_json|safe }};
-// Attach runtime state to each location
 DATA.locations.forEach(l => { l._open = false; });
 
-let targetLocId  = null;   // which location the input sheet is for
+let targetLocId  = null;
 let editItemQty  = 1;
-let previewItems = [];     // array of parsed items pending confirm
+let previewItems = [];
 
-// ── Emoji & helpers ───────────────────────────────────────────
+// ── Emoji helpers ─────────────────────────────────────────────
 const EMOJIS = ['🥚','🥛','🧀','🥩','🥦','🥕','🍎','🍌','🍋','🫐','🍓','🍇','🧅','🧄','🫑','🌽','🥬','🍅','🥑','🫒','🐟','🍤','🥗','🌮','🥜','🍜','🍣','🥤','🧃','🍺','🧂','🫙','🥫','🧈','🍳','🫕','🍱','🧆','🫘'];
 const LOC_EMOJIS = ['🧊','❄️','🗄️','📦','🥬','🍳','🍷','🥫','🧺','🏺','🥩','🧁','☕','🫙'];
-
 const EMAP = [
   [['牛奶','鮮奶','豆漿','米漿'],'🥛'],[['雞蛋','蛋'],'🥚'],[['豬','排骨','五花'],'🥩'],
   [['雞','雞胸','雞腿','雞翅'],'🍗'],[['魚','鮭','鯖','鱸'],'🐟'],[['蝦','海鮮','蛤蜊'],'🦐'],
@@ -320,28 +467,23 @@ const EMAP = [
   [['咖啡'],'☕'],[['麵','泡麵','拉麵'],'🍜'],[['飯','米飯'],'🍚'],[['起司'],'🧀'],
   [['奶油'],'🧈'],[['餅乾'],'🍪'],[['豆腐'],'⬜'],
 ];
-
 function autoEmoji(name) {
   for (const [kws,e] of EMAP) if (kws.some(k => name.includes(k))) return e;
   return '🍱';
 }
 
+// ── Date / status helpers ─────────────────────────────────────
 function daysLeft(d) {
   if (!d) return null;
   const t = new Date(); t.setHours(0,0,0,0);
   const e = new Date(d); e.setHours(0,0,0,0);
   return Math.round((e - t) / 86400000);
 }
-
 function getStatus(item) {
   const d = daysLeft(item.expiry_date);
   if (d === null) return 'n';
-  if (d < 0)  return 'd';
-  if (d <= 3) return 'd';
-  if (d <= 7) return 'w';
-  return 'g';
+  return d < 0 ? 'd' : d <= 3 ? 'd' : d <= 7 ? 'w' : 'g';
 }
-
 function badgeText(item) {
   const d = daysLeft(item.expiry_date);
   if (d === null) return '無到期';
@@ -350,13 +492,12 @@ function badgeText(item) {
   if (d === 1) return '明天到期';
   return `還剩${d}天`;
 }
-
 function fmtDate(s) {
   if (!s) return '';
-  return s.slice(5).replace('-', '/');  // "MM/DD"
+  return s.slice(5).replace('-','/');
 }
 
-// ── Global render ─────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────────
 function render() {
   renderSummary();
   renderLocs();
@@ -369,14 +510,35 @@ function renderSummary() {
       total++;
       const d = daysLeft(i.expiry_date);
       if (d === null) continue;
-      if (d < 0) exp++;
-      else if (d <= 7) warn++;
+      if (d < 0) exp++; else if (d <= 7) warn++;
     }
   }
   document.getElementById('gSummary').innerHTML =
-    `<div class="sc ${exp?'d':'g'}"><div class="n">${exp}</div><div class="l">已過期</div></div>
-     <div class="sc ${warn?'w':'g'}"><div class="n">${warn}</div><div class="l">快到期</div></div>
-     <div class="sc g"><div class="n">${total}</div><div class="l">總食物數</div></div>`;
+    `<div class="sc ${exp?'d':'g'}" onclick="filterByStatus('d')"><div class="n">${exp}</div><div class="l">已過期</div></div>
+     <div class="sc ${warn?'w':'g'}" onclick="filterByStatus('w')"><div class="n">${warn}</div><div class="l">快過期</div></div>
+     <div class="sc g" onclick="filterByStatus('all')"><div class="n">${total}</div><div class="l">總食物數</div></div>`;
+}
+
+function filterByStatus(type) {
+  if (type === 'all') {
+    DATA.locations.forEach(l => { l._open = true; });
+  } else {
+    DATA.locations.forEach(l => {
+      const has = l.items.some(i => {
+        const d = daysLeft(i.expiry_date);
+        if (type === 'd') return d !== null && d < 0;
+        if (type === 'w') return d !== null && d >= 0 && d <= 7;
+        return false;
+      });
+      if (has) l._open = true;
+    });
+  }
+  render();
+  // Scroll to first matching location
+  requestAnimationFrame(() => {
+    const first = document.querySelector('.loc-items.open');
+    if (first) first.closest('.loc-acc').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 function renderLocs() {
@@ -387,24 +549,34 @@ function renderLocs() {
   }
   el.innerHTML = DATA.locations.map(locHTML).join('') +
     `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
+
+  // Bind drag handles after render
+  DATA.locations.forEach(loc => {
+    const handle = document.querySelector(`#la-${loc.id} .drag-handle`);
+    if (handle) handle.addEventListener('touchstart', e => onDragHandleTouch(e, loc.id), { passive: false });
+  });
+
+  // Bind swipe on item cards
+  document.querySelectorAll('.swipe-wrap').forEach(wrap => {
+    const card = wrap.querySelector('.item-card');
+    if (card) initSwipe(wrap, card);
+  });
 }
 
 function locHTML(loc) {
   const expired  = loc.items.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d < 0; }).length;
   const expiring = loc.items.filter(i => { const d = daysLeft(i.expiry_date); return d !== null && d >= 0 && d <= 7; }).length;
-
   const badges = [
-    expired  ? `<span class="badge bd">${expired}過期</span>`  : '',
+    expired  ? `<span class="badge bd">${expired}過期</span>` : '',
     expiring ? `<span class="badge bw">${expiring}快到期</span>` : '',
   ].join('');
-
   const itemsHTML = loc.items.length === 0
     ? `<div class="loc-empty">還沒有食物，點 ＋ 新增</div>`
     : loc.items.map(itemHTML).join('');
-
   return `
   <div class="loc-acc" id="la-${loc.id}">
     <div class="loc-head" onclick="toggleLoc(${loc.id})">
+      <div class="drag-handle" onclick="event.stopPropagation()">≡</div>
       <div class="loc-icon">${loc.icon}</div>
       <div class="loc-info">
         <div class="loc-name">${loc.name}</div>
@@ -426,23 +598,163 @@ function itemHTML(item) {
   const badge = `<span class="badge b${st}">${badgeText(item)}</span>`;
   const qty = item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(1);
   return `
-  <div class="item-card s${st}" onclick="openEditItem(${item.id})">
-    <div class="item-emoji">${item.emoji||'🍱'}</div>
-    <div class="item-info">
-      <div class="item-name">${item.name}
-        <span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span>
+  <div class="swipe-wrap" id="sw-${item.id}">
+    <div class="item-card s${st}" id="ic-${item.id}" onclick="openEditItem(${item.id})">
+      <div class="item-emoji">${item.emoji||'🍱'}</div>
+      <div class="item-info">
+        <div class="item-name">${item.name}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span></div>
+        <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
       </div>
-      <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
+      ${badge}
     </div>
-    ${badge}
+    <button class="swipe-del" onclick="swipeDelete(${item.id})">
+      <span class="del-icon">🗑</span>刪除
+    </button>
   </div>`;
 }
 
-// ── Accordion toggle ──────────────────────────────────────────
+// ── Swipe to delete ───────────────────────────────────────────
+let activeSwipe = null;
+
+function closeAllSwipes(exceptId) {
+  document.querySelectorAll('.swipe-wrap').forEach(w => {
+    if (w.id !== exceptId) {
+      const c = w.querySelector('.item-card');
+      if (c) { c.style.transition = ''; c.style.transform = ''; }
+    }
+  });
+}
+
+function initSwipe(wrap, card) {
+  let startX = 0, startY = 0, dx = 0, isSwiping = false;
+
+  card.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dx = 0; isSwiping = false;
+    card.style.transition = 'none';
+  }, { passive: true });
+
+  card.addEventListener('touchmove', e => {
+    if (e.touches.length !== 1) return;
+    dx = e.touches[0].clientX - startX;
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (!isSwiping && Math.abs(dx) < 5 && dy < 5) return;
+    if (!isSwiping && dy > Math.abs(dx)) return; // vertical scroll, ignore
+    isSwiping = true;
+    if (dx > 0) dx = 0; // no right swipe
+    const clamped = Math.max(dx, -76);
+    card.style.transform = `translateX(${clamped}px)`;
+    e.preventDefault();
+  }, { passive: false });
+
+  card.addEventListener('touchend', () => {
+    card.style.transition = '';
+    if (dx < -38) {
+      card.style.transform = `translateX(-${76}px)`;
+      closeAllSwipes(wrap.id);
+    } else {
+      card.style.transform = '';
+    }
+  });
+}
+
+function swipeDelete(itemId) {
+  // Remove from DATA
+  let locFound = null;
+  for (const loc of DATA.locations) {
+    const idx = loc.items.findIndex(i => i.id === itemId);
+    if (idx !== -1) { locFound = loc; loc.items.splice(idx, 1); break; }
+  }
+  // Animate out
+  const wrap = document.getElementById('sw-' + itemId);
+  if (wrap) { wrap.style.transition = 'opacity 0.15s'; wrap.style.opacity = '0'; }
+  setTimeout(() => { render(); toast('已刪除'); }, 150);
+
+  fetch(`/api/items/${itemId}`, { method: 'DELETE' })
+    .then(r => { if (!r.ok) toast('刪除失敗', 'err'); })
+    .catch(() => toast('刪除失敗', 'err'));
+}
+
+// ── Drag to reorder locations ─────────────────────────────────
+let drag = null;
+
+function onDragHandleTouch(e, locId) {
+  if (e.touches.length !== 1) return;
+  e.preventDefault(); e.stopPropagation();
+
+  const touch = e.touches[0];
+  const accEl = document.getElementById('la-' + locId);
+  const rect  = accEl.getBoundingClientRect();
+
+  // Create ghost clone
+  const ghost = accEl.cloneNode(true);
+  ghost.className = 'loc-acc drag-ghost';
+  ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;`;
+  document.body.appendChild(ghost);
+  accEl.classList.add('dragging');
+
+  drag = { locId, accEl, ghost, offsetY: touch.clientY - rect.top };
+
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('touchend', onDragEnd, { once: true });
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  drag.ghost.style.top = `${touch.clientY - drag.offsetY}px`;
+
+  // Reorder in DOM to show insertion position
+  const locs = Array.from(document.querySelectorAll('#locsList .loc-acc:not(.dragging)'));
+  const addBtn = document.querySelector('#locsList .add-loc-btn');
+  let inserted = false;
+  for (const el of locs) {
+    const r = el.getBoundingClientRect();
+    if (touch.clientY < r.top + r.height / 2) {
+      document.getElementById('locsList').insertBefore(drag.accEl, el);
+      inserted = true; break;
+    }
+  }
+  if (!inserted && addBtn) document.getElementById('locsList').insertBefore(drag.accEl, addBtn);
+}
+
+function onDragEnd() {
+  if (!drag) return;
+  document.removeEventListener('touchmove', onDragMove);
+
+  drag.ghost.remove();
+  drag.accEl.classList.remove('dragging');
+
+  // Read new order from DOM
+  const newOrder = Array.from(document.querySelectorAll('#locsList .loc-acc'))
+    .map((el, idx) => ({ id: parseInt(el.id.replace('la-', '')), sort_order: idx }));
+
+  // Update DATA order
+  const orderMap = {};
+  newOrder.forEach(o => orderMap[o.id] = o.sort_order);
+  DATA.locations.sort((a, b) => (orderMap[a.id] ?? 99) - (orderMap[b.id] ?? 99));
+
+  drag = null;
+  render();
+
+  fetch('/api/locations/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newOrder),
+  }).catch(() => toast('排序儲存失敗', 'err'));
+}
+
+// ── Accordion ─────────────────────────────────────────────────
 function toggleLoc(id) {
+  // Close open swipes first
+  closeAllSwipes('');
   const loc = DATA.locations.find(l => l.id === id);
   if (loc) loc._open = !loc._open;
   renderLocs();
+  renderSummary();
 }
 
 // ── Overlay helpers ───────────────────────────────────────────
@@ -462,7 +774,7 @@ document.addEventListener('keydown', e => {
 // ── Toast ─────────────────────────────────────────────────────
 function toast(msg, type='') {
   const el = document.createElement('div');
-  el.className = 'toast' + (type?' '+type:'');
+  el.className = 'toast' + (type ? ' '+type : '');
   el.textContent = msg;
   document.getElementById('toasts').appendChild(el);
   setTimeout(() => el.remove(), 2800);
@@ -477,31 +789,24 @@ function buildEGrid(gridId, hiddenId, list, selected) {
 }
 function pickE(gid, hid, e, el) {
   document.getElementById(hid).value = e;
-  document.querySelectorAll('#'+gid+' .eopt').forEach(x=>x.classList.remove('sel'));
+  document.querySelectorAll('#'+gid+' .eopt').forEach(x => x.classList.remove('sel'));
   el.classList.add('sel');
-}
-function setESelected(gid, hid, e) {
-  document.getElementById(hid).value = e;
-  document.querySelectorAll('#'+gid+' .eopt').forEach(x=>x.classList.toggle('sel', x.textContent.trim()===e));
 }
 
 // ── Add Location ──────────────────────────────────────────────
-(function initAddLocEmoji() {
-  buildEGrid('alEmojiGrid','alEmoji', LOC_EMOJIS, '🧊');
-})();
+(function() { buildEGrid('alEmojiGrid','alEmoji', LOC_EMOJIS, '🧊'); })();
 
-// Clear + focus name field whenever the addLocSheet is opened
 function openAddLoc() {
   showSheet('addLocSheet');
   document.getElementById('alName').value = '';
   setTimeout(() => document.getElementById('alName').focus(), 80);
 }
-
 async function addLoc() {
   const name = document.getElementById('alName').value.trim();
   if (!name) { toast('請輸入名稱','err'); return; }
   const icon = document.getElementById('alEmoji').value;
-  const r = await fetch('/api/locations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,icon})});
+  const sort_order = DATA.locations.length;
+  const r = await fetch('/api/locations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,icon,sort_order})});
   if (r.ok) {
     const loc = await r.json();
     loc.items = []; loc._open = false;
@@ -516,7 +821,7 @@ async function addLoc() {
 function openEditLoc(id, e) {
   e.stopPropagation();
   const loc = DATA.locations.find(l => l.id === id);
-  document.getElementById('elId').value = id;
+  document.getElementById('elId').value   = id;
   document.getElementById('elName').value = loc.name;
   showSheet('editLocSheet');
 }
@@ -526,18 +831,18 @@ async function saveLoc() {
   if (!name) { toast('名稱不能為空','err'); return; }
   const r = await fetch(`/api/locations/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
   if (r.ok) {
-    const loc = DATA.locations.find(l=>l.id===id);
+    const loc = DATA.locations.find(l => l.id === id);
     if (loc) loc.name = name;
     hideSheet('editLocSheet'); render(); toast('已儲存');
   } else toast('儲存失敗','err');
 }
 async function delLoc() {
-  const id = parseInt(document.getElementById('elId').value);
-  const loc = DATA.locations.find(l=>l.id===id);
+  const id  = parseInt(document.getElementById('elId').value);
+  const loc = DATA.locations.find(l => l.id === id);
   if (!confirm(`確定刪除「${loc?.name}」？底下 ${loc?.items.length} 項食物也會刪除。`)) return;
   const r = await fetch(`/api/locations/${id}`,{method:'DELETE'});
   if (r.ok) {
-    DATA.locations = DATA.locations.filter(l=>l.id!==id);
+    DATA.locations = DATA.locations.filter(l => l.id !== id);
     hideSheet('editLocSheet'); render(); toast('已刪除');
   } else toast('刪除失敗','err');
 }
@@ -546,7 +851,7 @@ async function delLoc() {
 function openInput(locId, e) {
   e.stopPropagation();
   targetLocId = locId;
-  const loc = DATA.locations.find(l=>l.id===locId);
+  const loc = DATA.locations.find(l => l.id === locId);
   document.getElementById('inputTitle').textContent = `加入 ${loc.icon} ${loc.name}`;
   document.getElementById('voiceText').value = '';
   document.getElementById('vstatus').textContent = '';
@@ -555,7 +860,6 @@ function openInput(locId, e) {
   previewItems = [];
   showSheet('inputSheet');
 }
-
 function backToInput() {
   document.getElementById('inputStep').style.display = '';
   document.getElementById('previewStep').style.display = 'none';
@@ -563,20 +867,18 @@ function backToInput() {
 
 // ── Voice ─────────────────────────────────────────────────────
 let recog = null, isRec = false;
-const vBtn = document.getElementById('voiceBtn');
-
 function toggleVoice() { isRec ? stopVoice() : startVoice(); }
 function startVoice() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { toast('請用 Chrome 或 Edge','err'); return; }
   recog = new SR(); recog.lang = 'zh-TW'; recog.continuous = false; recog.interimResults = true;
-  recog.onstart  = () => { isRec=true; vBtn.classList.add('rec'); vBtn.textContent='⏹'; setVS('🔴 錄音中⋯'); };
+  recog.onstart  = () => { isRec=true; voiceBtn.classList.add('rec'); voiceBtn.textContent='⏹'; setVS('🔴 錄音中⋯'); };
   recog.onresult = e => { let t=''; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; document.getElementById('voiceText').value=t; };
-  recog.onend    = () => { isRec=false; vBtn.classList.remove('rec'); vBtn.textContent='🎤'; setVS('✅ 完成，按「解析文字」繼續'); };
-  recog.onerror  = e => { isRec=false; vBtn.classList.remove('rec'); vBtn.textContent='🎤'; setVS('⚠️ '+e.error); };
+  recog.onend    = () => { isRec=false; voiceBtn.classList.remove('rec'); voiceBtn.textContent='🎤'; setVS('✅ 完成，按「解析文字」繼續'); };
+  recog.onerror  = e => { isRec=false; voiceBtn.classList.remove('rec'); voiceBtn.textContent='🎤'; setVS('⚠️ '+e.error); };
   recog.start();
 }
-function stopVoice() { recog&&recog.stop(); }
+function stopVoice() { recog?.stop(); }
 function setVS(m) { document.getElementById('vstatus').textContent = m; }
 
 // ── Parse ─────────────────────────────────────────────────────
@@ -589,16 +891,9 @@ async function parseInput() {
     const r = await fetch('/api/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.error||'失敗');
-
-    // data is a list
     previewItems = data.map((item,idx) => ({
-      ...item,
-      _id:     'p'+idx,
-      _open:   false,
-      emoji:   autoEmoji(item.name),
-      _qty:    item.quantity || 1,
+      ...item, _id:'p'+idx, _open:false, emoji:autoEmoji(item.name), _qty:item.quantity||1,
     }));
-
     renderPreview();
     document.getElementById('inputStep').style.display = 'none';
     document.getElementById('previewStep').style.display = '';
@@ -615,27 +910,23 @@ function renderPreview() {
   document.getElementById('prevCount').textContent = previewItems.length;
   document.getElementById('previewList').innerHTML = previewItems.map(prevCardHTML).join('');
 }
-
 function prevCardHTML(item) {
   const dL = daysLeft(item.expiry_date);
-  const exText = item.expiry_date
-    ? (dL < 0 ? `已過期${Math.abs(dL)}天` : `${dL}天後到期`)
-    : '未設到期';
-  const qtyDisplay = (item._qty||1) % 1 === 0 ? (item._qty||1) : (item._qty||1).toFixed(1);
+  const exText = item.expiry_date ? (dL < 0 ? `已過期${Math.abs(dL)}天` : `${dL}天後到期`) : '未設到期';
+  const qD = (item._qty||1) % 1 === 0 ? (item._qty||1) : (item._qty||1).toFixed(1);
   return `
   <div class="prev-card" id="pc-${item._id}">
     <div class="prev-summary" onclick="togglePrevEdit('${item._id}')">
       <span class="prev-emoji">${item.emoji}</span>
       <div class="prev-info">
         <span class="prev-name">${item.name}</span>
-        <span class="prev-detail">${qtyDisplay}${item.unit||'個'} · ${exText}</span>
+        <span class="prev-detail">${qD}${item.unit||'個'} · ${exText}</span>
       </div>
       <span class="prev-edit-icon">${item._open?'▲':'✏️'}</span>
     </div>
     ${item._open ? prevEditHTML(item) : ''}
   </div>`;
 }
-
 function prevEditHTML(item) {
   const qD = (item._qty||1) % 1 === 0 ? (item._qty||1) : (item._qty||1).toFixed(1);
   return `
@@ -659,18 +950,16 @@ function prevEditHTML(item) {
     <button class="btn-del" onclick="pRemove('${item._id}')">🗑 移除此項</button>
   </div>`;
 }
-
 function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 function togglePrevEdit(id) {
-  const item = previewItems.find(i=>i._id===id);
+  const item = previewItems.find(i => i._id === id);
   if (item) { item._open = !item._open; renderPreview(); }
 }
 function pUpdate(id, field, val) {
-  const item = previewItems.find(i=>i._id===id);
+  const item = previewItems.find(i => i._id === id);
   if (!item) return;
   item[field] = val;
-  // Live-update summary line
   const dL = daysLeft(item.expiry_date);
   const exT = item.expiry_date ? (dL<0?`已過期${Math.abs(dL)}天`:`${dL}天後到期`) : '未設到期';
   const qD = (item._qty||1)%1===0?(item._qty||1):(item._qty||1).toFixed(1);
@@ -680,26 +969,26 @@ function pUpdate(id, field, val) {
   if (nm)  nm.textContent  = item.name;
 }
 function pQty(id, delta) {
-  const item = previewItems.find(i=>i._id===id);
+  const item = previewItems.find(i => i._id === id);
   if (!item) return;
   item._qty = Math.max(0.1, Math.round(((item._qty||1) + delta) * 10) / 10);
   const el = document.getElementById('pqd-'+id);
   if (el) el.textContent = item._qty%1===0?item._qty:item._qty.toFixed(1);
   item.quantity = item._qty;
-  pUpdate(id, 'unit', item.unit); // trigger detail refresh
+  pUpdate(id, 'unit', item.unit);
 }
 function pPickEmoji(id, e, el) {
-  const item = previewItems.find(i=>i._id===id);
+  const item = previewItems.find(i => i._id === id);
   if (!item) return;
   item.emoji = e;
-  document.querySelectorAll(`#peg-${id} .eopt`).forEach(x=>x.classList.remove('sel'));
+  document.querySelectorAll(`#peg-${id} .eopt`).forEach(x => x.classList.remove('sel'));
   el.classList.add('sel');
   const em = document.querySelector(`#pc-${id} .prev-emoji`);
   if (em) em.textContent = e;
 }
 function pRemove(id) {
-  previewItems = previewItems.filter(i=>i._id!==id);
-  if (previewItems.length === 0) { backToInput(); return; }
+  previewItems = previewItems.filter(i => i._id !== id);
+  if (!previewItems.length) { backToInput(); return; }
   renderPreview();
 }
 
@@ -708,7 +997,6 @@ async function submitBatch() {
   if (!targetLocId || !previewItems.length) return;
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 儲存⋯';
-
   const payload = previewItems.map(i => ({
     location_id:   targetLocId,
     name:          i.name,
@@ -719,17 +1007,12 @@ async function submitBatch() {
     expiry_date:   i.expiry_date   || null,
     notes:         i.notes || '',
   }));
-
   try {
     const r = await fetch('/api/items/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if (!r.ok) throw new Error();
     const saved = await r.json();
-    const loc = DATA.locations.find(l=>l.id===targetLocId);
-    if (loc) {
-      loc.items.push(...saved);
-      loc.items = sortItems(loc.items);
-      loc._open = true;
-    }
+    const loc = DATA.locations.find(l => l.id === targetLocId);
+    if (loc) { loc.items.push(...saved); loc.items = sortItems(loc.items); loc._open = true; }
     hideSheet('inputSheet');
     previewItems = [];
     render();
@@ -739,87 +1022,73 @@ async function submitBatch() {
 }
 
 function sortItems(items) {
-  const maxDate = '9999-12-31';
-  return items.sort((a,b)=>{
-    const da = a.expiry_date||maxDate, db = b.expiry_date||maxDate;
+  return items.sort((a,b) => {
     if (!a.expiry_date && !b.expiry_date) return a.name.localeCompare(b.name);
     if (!a.expiry_date) return 1;
     if (!b.expiry_date) return -1;
-    return da < db ? -1 : 1;
+    return a.expiry_date < b.expiry_date ? -1 : 1;
   });
 }
 
-// ── Edit existing item ────────────────────────────────────────
+// ── Edit item ─────────────────────────────────────────────────
 function openEditItem(id) {
+  // Close any open swipes
+  closeAllSwipes('');
   let item = null;
-  for (const loc of DATA.locations) {
-    item = loc.items.find(i=>i.id===id);
-    if (item) break;
-  }
+  for (const loc of DATA.locations) { item = loc.items.find(i => i.id === id); if (item) break; }
   if (!item) return;
-
   document.getElementById('eId').value       = id;
-  document.getElementById('eName').value      = item.name;
+  document.getElementById('eName').value     = item.name;
   editItemQty = item.quantity;
   document.getElementById('eQD').textContent = editItemQty%1===0?editItemQty:editItemQty.toFixed(1);
-  document.getElementById('eUnit').value      = item.unit;
-  document.getElementById('ePurchase').value  = item.purchase_date||'';
-  document.getElementById('eExpiry').value    = item.expiry_date||'';
-  document.getElementById('eNotes').value     = item.notes||'';
-
-  // Location select
-  document.getElementById('eLoc').innerHTML = DATA.locations.map(l=>
+  document.getElementById('eUnit').value     = item.unit;
+  document.getElementById('ePurchase').value = item.purchase_date||'';
+  document.getElementById('eExpiry').value   = item.expiry_date||'';
+  document.getElementById('eNotes').value    = item.notes||'';
+  document.getElementById('eLoc').innerHTML  = DATA.locations.map(l =>
     `<option value="${l.id}"${l.id===item.location_id?' selected':''}>${l.icon} ${l.name}</option>`
   ).join('');
-
   buildEGrid('eEmojiGrid','eEmoji', EMOJIS, item.emoji||'🍱');
   showSheet('editSheet');
 }
-
 function eq(d) {
   editItemQty = Math.max(0.1, Math.round((editItemQty + d) * 10) / 10);
   document.getElementById('eQD').textContent = editItemQty%1===0?editItemQty:editItemQty.toFixed(1);
 }
-
 async function submitEdit() {
-  const id   = parseInt(document.getElementById('eId').value);
-  const name = document.getElementById('eName').value.trim();
+  const id      = parseInt(document.getElementById('eId').value);
+  const name    = document.getElementById('eName').value.trim();
   if (!name) { toast('名稱不能為空','err'); return; }
   const newLocId = parseInt(document.getElementById('eLoc').value);
-
   const r = await fetch(`/api/items/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    name,
-    emoji:         document.getElementById('eEmoji').value,
-    quantity:      editItemQty,
-    unit:          document.getElementById('eUnit').value,
-    location_id:   newLocId,
+    name, emoji: document.getElementById('eEmoji').value,
+    quantity: editItemQty, unit: document.getElementById('eUnit').value,
+    location_id: newLocId,
     purchase_date: document.getElementById('ePurchase').value||null,
     expiry_date:   document.getElementById('eExpiry').value||null,
-    notes:         document.getElementById('eNotes').value,
+    notes: document.getElementById('eNotes').value,
   })});
   if (r.ok) {
     const updated = await r.json();
-    // Remove from old location
-    for (const loc of DATA.locations) loc.items = loc.items.filter(i=>i.id!==id);
-    // Add to new (or same) location
-    const tLoc = DATA.locations.find(l=>l.id===newLocId);
+    for (const loc of DATA.locations) loc.items = loc.items.filter(i => i.id !== id);
+    const tLoc = DATA.locations.find(l => l.id === newLocId);
     if (tLoc) { tLoc.items.push(updated); tLoc.items = sortItems(tLoc.items); }
     hideSheet('editSheet'); render(); toast('已儲存');
   } else toast('儲存失敗','err');
 }
-
 async function delFromEdit() {
   const id   = parseInt(document.getElementById('eId').value);
   const name = document.getElementById('eName').value;
   if (!confirm(`確定刪除「${name}」嗎？`)) return;
   const r = await fetch(`/api/items/${id}`,{method:'DELETE'});
   if (r.ok) {
-    for (const loc of DATA.locations) loc.items = loc.items.filter(i=>i.id!==id);
+    for (const loc of DATA.locations) loc.items = loc.items.filter(i => i.id !== id);
     hideSheet('editSheet'); render(); toast('已刪除「'+name+'」');
   } else toast('刪除失敗','err');
 }
 
 // ── Boot ──────────────────────────────────────────────────────
+const voiceBtn = document.getElementById('voiceBtn');
 render();
 </script>
 </body>

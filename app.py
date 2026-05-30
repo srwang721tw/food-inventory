@@ -32,12 +32,13 @@ class Location(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(100), nullable=False)
     icon       = db.Column(db.String(10), default="📦")
+    sort_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     items      = db.relationship("Item", backref="location", lazy=True,
                                  cascade="all, delete-orphan")
 
     def to_dict(self):
-        return {"id": self.id, "name": self.name, "icon": self.icon}
+        return {"id": self.id, "name": self.name, "icon": self.icon, "sort_order": self.sort_order}
 
 
 class Item(db.Model):
@@ -73,7 +74,7 @@ class Item(db.Model):
 
 @app.route("/")
 def index():
-    locations = Location.query.order_by(Location.created_at).all()
+    locations = Location.query.order_by(Location.sort_order, Location.created_at).all()
     data = {"locations": []}
     for loc in locations:
         items = sorted(loc.items, key=lambda i: (
@@ -124,7 +125,18 @@ def api_locations():
         db.session.add(loc)
         db.session.commit()
         return jsonify(loc.to_dict()), 201
-    return jsonify([l.to_dict() for l in Location.query.order_by(Location.created_at).all()])
+    return jsonify([l.to_dict() for l in Location.query.order_by(Location.sort_order, Location.created_at).all()])
+
+
+@app.route("/api/locations/reorder", methods=["POST"])
+def api_locations_reorder():
+    items = request.get_json()
+    for item in (items or []):
+        loc = Location.query.get(item["id"])
+        if loc:
+            loc.sort_order = item["sort_order"]
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/locations/<int:loc_id>", methods=["PUT", "DELETE"])
@@ -223,7 +235,6 @@ def api_item(item_id):
 with app.app_context():
     db.create_all()
 
-    # Migrate: add emoji column to existing databases
     try:
         cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("items")]
         if "emoji" not in cols:
@@ -233,11 +244,21 @@ with app.app_context():
     except Exception:
         pass
 
+    try:
+        loc_cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("locations")]
+        if "sort_order" not in loc_cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE locations ADD COLUMN sort_order INTEGER DEFAULT 0"))
+                conn.execute(text("UPDATE locations SET sort_order = id"))
+                conn.commit()
+    except Exception:
+        pass
+
     if Location.query.count() == 0:
         db.session.add_all([
-            Location(name="冰箱",  icon="🧊"),
-            Location(name="冷凍庫", icon="❄️"),
-            Location(name="乾貨櫃", icon="🗄️"),
+            Location(name="冰箱",  icon="🧊", sort_order=0),
+            Location(name="冷凍庫", icon="❄️", sort_order=1),
+            Location(name="乾貨櫃", icon="🗄️", sort_order=2),
         ])
         db.session.commit()
 
