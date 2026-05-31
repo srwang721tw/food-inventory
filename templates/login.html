@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>登入 — 食物庫存</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── CSS Variables ── */
+    :root {
+      --bg:      #f2f2f7;
+      --card:    #ffffff;
+      --primary: #30b0c7;
+      --danger:  #ff3b30;
+      --text:    #1c1c1e;
+      --text2:   #636366;
+      --text3:   #aeaeb2;
+      --border:  #e5e5ea;
+      --shadow:  0 2px 14px rgba(0,0,0,0.07);
+      --radius:  16px;
+      --rsm:     10px;
+    }
+    .dark {
+      --bg:      #1c1c1e;
+      --card:    #2c2c2e;
+      --primary: #30b0c7;
+      --danger:  #ff453a;
+      --text:    #f2f2f7;
+      --text2:   rgba(235,235,245,0.6);
+      --text3:   rgba(235,235,245,0.3);
+      --border:  #38383a;
+      --shadow:  0 2px 14px rgba(0,0,0,0.4);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { color-scheme: light; }
+    html.dark { color-scheme: dark; }
+
+    body {
+      font-family: 'Noto Sans TC', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100dvh;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, color 0.2s;
+      padding: 16px;
+    }
+
+    /* ── Theme toggle ── */
+    .theme-btn {
+      position: fixed; top: 16px; right: 16px;
+      width: 34px; height: 34px;
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 50%; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+      z-index: 10;
+    }
+    .theme-btn:active { opacity: 0.7; }
+
+    /* ── Login card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 36px 28px 32px;
+      width: min(390px, 100%);
+      box-shadow: var(--shadow);
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 6px;
+      font-size: 52px;
+      line-height: 1;
+    }
+    .app-name {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
+    }
+    .app-sub {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text3);
+      margin-bottom: 28px;
+    }
+
+    /* ── Form ── */
+    .fg { margin-bottom: 14px; }
+    .fg label {
+      display: block; font-size: 12px; font-weight: 500;
+      color: var(--text2); margin-bottom: 5px;
+    }
+    .fg input {
+      width: 100%; padding: 11px 13px;
+      border-radius: var(--rsm);
+      border: 1.5px solid var(--border);
+      font-size: 15px; font-family: inherit;
+      color: var(--text); background: var(--bg);
+      outline: none;
+      transition: border-color 0.14s, background 0.2s, color 0.2s;
+    }
+    .fg input:focus { border-color: var(--primary); }
+    .fg input::placeholder { color: var(--text3); }
+
+    /* ── Error message ── */
+    .err-msg {
+      background: rgba(255,59,48,0.1);
+      border: 1px solid rgba(255,59,48,0.25);
+      border-radius: var(--rsm);
+      color: var(--danger);
+      font-size: 13px; font-weight: 500;
+      padding: 9px 13px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .err-msg.show { display: block; }
+
+    /* ── Button ── */
+    .btn-login {
+      width: 100%; padding: 13px;
+      border: none; border-radius: var(--rsm);
+      font-size: 15px; font-weight: 600;
+      font-family: inherit;
+      background: var(--primary); color: #fff;
+      cursor: pointer;
+      transition: opacity 0.12s, transform 0.1s;
+      margin-top: 6px;
+    }
+    .btn-login:active { opacity: 0.82; transform: scale(0.98); }
+
+    /* ── Landscape adjustments ── */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .card { padding: 20px 28px 20px; }
+      .logo { font-size: 38px; margin-bottom: 4px; }
+      .app-sub { margin-bottom: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<button class="theme-btn" id="themeBtn" onclick="cycleTheme()" title="切換主題"></button>
+
+<div class="card">
+  <div class="logo">🍱</div>
+  <div class="app-name">食物庫存</div>
+  <div class="app-sub">王李夫妻共享食物庫存系統</div>
+
+  {% if error %}
+  <div class="err-msg show">{{ error }}</div>
+  {% else %}
+  <div class="err-msg" id="errMsg"></div>
+  {% endif %}
+
+  <form method="POST" action="/login">
+    <div class="fg">
+      <label for="username">帳號</label>
+      <input type="text" id="username" name="username" placeholder="請輸入帳號"
+             autocomplete="username" autocapitalize="none" spellcheck="false"
+             required autofocus>
+    </div>
+    <div class="fg">
+      <label for="password">密碼</label>
+      <input type="password" id="password" name="password" placeholder="請輸入密碼"
+             autocomplete="current-password" required>
+    </div>
+    <button class="btn-login" type="submit">登入</button>
+  </form>
+</div>
+
+<script>
+// ── Theme ─────────────────────────────────────────────────────
+const THEMES = ['system', 'light', 'dark'];
+const ICONS  = { system: '🌓', light: '☀️', dark: '🌙' };
+let currentTheme = localStorage.getItem('theme') || 'system';
+
+function applyTheme(t) {
+  const dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.getElementById('themeBtn').textContent = ICONS[t];
+}
+function cycleTheme() {
+  const idx = THEMES.indexOf(currentTheme);
+  currentTheme = THEMES[(idx + 1) % THEMES.length];
+  localStorage.setItem('theme', currentTheme);
+  applyTheme(currentTheme);
+}
+applyTheme(currentTheme);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (currentTheme === 'system') applyTheme('system');
+});
+</script>
+</body>
+</html>

@@ -342,7 +342,11 @@
 <div class="header">
   <div class="header-top">
     <h1>🏠 王李夫妻<span>食物庫存</span></h1>
-    <button class="theme-btn" id="themeBtn" onclick="cycleTheme()" title="切換主題"></button>
+    <div style="display:flex;align-items:center;gap:6px">
+      {% if is_admin %}<button class="theme-btn" onclick="openUsersSheet()" title="使用者管理">👥</button>{% endif %}
+      <button class="theme-btn" onclick="confirmLogout()" title="登出 {{ current_username }}">🚪</button>
+      <button class="theme-btn" id="themeBtn" onclick="cycleTheme()" title="切換主題"></button>
+    </div>
   </div>
 </div>
 
@@ -438,6 +442,23 @@
     <div class="btn-row">
       <button class="btn btn-c" onclick="hideSheet('addLocSheet')">取消</button>
       <button class="btn btn-p" onclick="addLoc()">新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 使用者管理 Sheet（admin only） ═══ -->
+<div class="overlay hidden" id="usersSheet">
+  <div class="sheet">
+    <div class="handle"></div>
+    <h2>使用者管理</h2>
+    <div class="slabel">現有帳號</div>
+    <div id="usersList" style="margin-bottom:18px"></div>
+    <div class="slabel">新增帳號</div>
+    <div class="fg"><label>帳號</label><input type="text" id="newUsername" placeholder="帳號名稱" autocapitalize="none" spellcheck="false"></div>
+    <div class="fg"><label>密碼</label><input type="password" id="newPassword" placeholder="設定密碼"></div>
+    <div class="btn-row">
+      <button class="btn btn-c" onclick="hideSheet('usersSheet')">關閉</button>
+      <button class="btn btn-p" onclick="addUser()">新增帳號</button>
     </div>
   </div>
 </div>
@@ -1173,6 +1194,50 @@ async function delFromEdit() {
     for (const loc of DATA.locations) loc.items = loc.items.filter(i => i.id !== id);
     hideSheet('editSheet'); render(); toast('已刪除「'+name+'」');
   } else toast('刪除失敗','err');
+}
+
+// ── Logout ────────────────────────────────────────────────────
+function confirmLogout() {
+  if (confirm('確定要登出嗎？')) window.location.href = '/logout';
+}
+
+// ── User management (admin only) ──────────────────────────────
+async function openUsersSheet() {
+  showSheet('usersSheet');
+  await refreshUsersList();
+}
+async function refreshUsersList() {
+  const r = await fetch('/api/users');
+  if (!r.ok) { toast('載入失敗','err'); return; }
+  const users = await r.json();
+  document.getElementById('usersList').innerHTML = users.length === 0
+    ? '<p style="font-size:13px;color:var(--text3);text-align:center;padding:12px 0">尚無帳號</p>'
+    : users.map(u => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div>
+          <span style="font-size:14px;font-weight:600">${u.username}</span>
+          ${u.is_admin ? '<span style="font-size:11px;color:var(--primary);margin-left:6px">管理員</span>' : ''}
+        </div>
+        ${u.is_admin ? '' : `<button onclick="deleteUser(${u.id},'${u.username}')" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;padding:4px 6px">🗑</button>`}
+      </div>`).join('');
+}
+async function addUser() {
+  const username = document.getElementById('newUsername').value.trim();
+  const password = document.getElementById('newPassword').value.trim();
+  if (!username || !password) { toast('帳號和密碼不能為空','err'); return; }
+  const r = await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+  const data = await r.json();
+  if (!r.ok) { toast(data.error||'新增失敗','err'); return; }
+  document.getElementById('newUsername').value = '';
+  document.getElementById('newPassword').value = '';
+  toast('已新增帳號「'+username+'」');
+  await refreshUsersList();
+}
+async function deleteUser(id, username) {
+  if (!confirm(`確定刪除帳號「${username}」嗎？`)) return;
+  const r = await fetch(`/api/users/${id}`,{method:'DELETE'});
+  if (r.ok) { toast('已刪除「'+username+'」'); await refreshUsersList(); }
+  else { const d = await r.json(); toast(d.error||'刪除失敗','err'); }
 }
 
 // ── Boot ──────────────────────────────────────────────────────
