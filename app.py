@@ -61,6 +61,26 @@ def api_login_required(f):
     return deco
 
 
+# ── Ownership helpers ─────────────────────────────────────────────────────────
+
+def _own_location(loc_id: int):
+    """Return Location if it belongs to current user, else abort 403."""
+    from flask import abort
+    loc = Location.query.get_or_404(loc_id)
+    if loc.user_id != session["user_id"]:
+        abort(403)
+    return loc
+
+
+def _own_item(item_id: int):
+    """Return Item if its location belongs to current user, else abort 403."""
+    from flask import abort
+    item = Item.query.get_or_404(item_id)
+    if item.location.user_id != session["user_id"]:
+        abort(403)
+    return item
+
+
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class User(db.Model):
@@ -70,11 +90,14 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin      = db.Column(db.Boolean, default=False)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    locations     = db.relationship("Location", backref="owner", lazy=True,
+                                    cascade="all, delete-orphan")
 
 
 class Location(db.Model):
     __tablename__ = "locations"
     id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     name       = db.Column(db.String(100), nullable=False)
     icon       = db.Column(db.String(10), default="📦")
     sort_order = db.Column(db.Integer, default=0)
@@ -145,8 +168,10 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    current_user = User.query.get(session["user_id"])
-    locations = Location.query.order_by(Location.sort_order, Location.created_at).all()
+    uid          = session["user_id"]
+    current_user = User.query.get(uid)
+    locations    = Location.query.filter_by(user_id=uid).order_by(
+                       Location.sort_order, Location.created_at).all()
     data = {"locations": []}
     for loc in locations:
         items = sorted(loc.items, key=lambda i: (
@@ -168,16 +193,16 @@ def index():
 @app.route("/location/<int:loc_id>")
 @login_required
 def location_view(loc_id):
-    loc   = Location.query.get_or_404(loc_id)
-    today = date.today()
+    loc   = _own_location(loc_id)
     items = Item.query.filter_by(location_id=loc_id).order_by(Item.created_at.desc()).all()
     items = sorted(items, key=lambda i: (
         i.expiry_date is None,
         i.expiry_date or date.max,
         i.name,
     ))
-    all_locations  = Location.query.order_by(Location.name).all()
-    items_json     = json.dumps([i.to_dict() for i in items],      ensure_ascii=False)
+    uid            = session["user_id"]
+    all_locations  = Location.query.filter_by(user_id=uid).order_by(Location.name).all()
+    items_json     = json.dumps([i.to_dict() for i in items],         ensure_ascii=False)
     locations_json = json.dumps([l.to_dict() for l in all_locations], ensure_ascii=False)
     return render_template(
         "location.html",
@@ -235,22 +260,26 @@ def api_delete_user(uid):
 @app.route("/api/locations", methods=["GET", "POST"])
 @api_login_required
 def api_locations():
+    uid = session["user_id"]
     if request.method == "POST":
         data = request.get_json()
-        loc  = Location(name=data["name"], icon=data.get("icon", "📦"))
+        loc  = Location(name=data["name"], icon=data.get("icon", "📦"), user_id=uid)
         db.session.add(loc)
         db.session.commit()
         return jsonify(loc.to_dict()), 201
-    return jsonify([l.to_dict() for l in Location.query.order_by(Location.sort_order, Location.created_at).all()])
+    return jsonify([l.to_dict() for l in
+                    Location.query.filter_by(user_id=uid).order_by(
+                        Location.sort_order, Location.created_at).all()])
 
 
 @app.route("/api/locations/reorder", methods=["POST"])
 @api_login_required
 def api_locations_reorder():
+    uid   = session["user_id"]
     items = request.get_json()
     for item in (items or []):
         loc = Location.query.get(item["id"])
-        if loc:
+        if loc and loc.user_id == uid:       # only reorder own locations
             loc.sort_order = item["sort_order"]
     db.session.commit()
     return jsonify({"ok": True})
@@ -259,7 +288,7 @@ def api_locations_reorder():
 @app.route("/api/locations/<int:loc_id>", methods=["PUT", "DELETE"])
 @api_login_required
 def api_location(loc_id):
-    loc = Location.query.get_or_404(loc_id)
+    loc = _own_location(loc_id)
     if request.method == "DELETE":
         db.session.delete(loc)
         db.session.commit()
@@ -282,8 +311,12 @@ def api_parse():
     backend = os.environ.get("NLP_BACKEND", "regex").lower()
     try:
         if backend == "gemini" and os.environ.get("GEMINI_API_KEY"):
-            from gemini_nlp import parse_with_gemini
-            return jsonify(parse_with_gemini(text))
+            try:
+                from gemini_nlp import parse_with_gemini
+                return jsonify(parse_with_gemini(text))
+            except Exception:
+                # Gemini failed (429, network error, etc.) — fall back to regex silently
+                return jsonify(parse_multiple_foods(text))
         else:
             return jsonify(parse_multiple_foods(text))
     except Exception as e:
@@ -295,9 +328,15 @@ def api_parse():
 @app.route("/api/items/batch", methods=["POST"])
 @api_login_required
 def api_items_batch():
+    uid        = session["user_id"]
     items_data = request.get_json()
     if not isinstance(items_data, list):
         return jsonify({"error": "Expected a list"}), 400
+    # Verify all target locations belong to current user
+    for data in items_data:
+        loc = Location.query.get(data.get("location_id"))
+        if not loc or loc.user_id != uid:
+            return jsonify({"error": "無效地點"}), 403
     created = []
     for data in items_data:
         item = Item(
@@ -319,7 +358,11 @@ def api_items_batch():
 @app.route("/api/items", methods=["POST"])
 @api_login_required
 def api_add_item():
+    uid  = session["user_id"]
     data = request.get_json()
+    loc  = Location.query.get(data.get("location_id"))
+    if not loc or loc.user_id != uid:
+        return jsonify({"error": "無效地點"}), 403
     item = Item(
         location_id   = data["location_id"],
         name          = data["name"],
@@ -338,7 +381,7 @@ def api_add_item():
 @app.route("/api/items/<int:item_id>", methods=["GET", "PUT", "DELETE"])
 @api_login_required
 def api_item(item_id):
-    item = Item.query.get_or_404(item_id)
+    item = _own_item(item_id)
     if request.method == "GET":
         return jsonify(item.to_dict())
     if request.method == "DELETE":
@@ -346,15 +389,22 @@ def api_item(item_id):
         db.session.commit()
         return jsonify({"ok": True})
     data = request.get_json()
+    # If moving to a different location, verify it belongs to current user
+    if "location_id" in data:
+        uid = session["user_id"]
+        loc = Location.query.get(data["location_id"])
+        if not loc or loc.user_id != uid:
+            return jsonify({"error": "無效地點"}), 403
+        item.location_id = int(data["location_id"])
     for field in ("name", "emoji", "unit", "notes"):
         if field in data:
             setattr(item, field, data[field])
-    if "quantity"      in data: item.quantity    = float(data["quantity"])
-    if "location_id"   in data: item.location_id = int(data["location_id"])
+    if "quantity" in data:
+        item.quantity = float(data["quantity"])
     if "purchase_date" in data:
         item.purchase_date = date.fromisoformat(data["purchase_date"]) if data["purchase_date"] else None
     if "expiry_date" in data:
-        item.expiry_date   = date.fromisoformat(data["expiry_date"])   if data["expiry_date"]   else None
+        item.expiry_date = date.fromisoformat(data["expiry_date"]) if data["expiry_date"] else None
     item.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify(item.to_dict())
@@ -365,7 +415,9 @@ def api_item(item_id):
 with app.app_context():
     db.create_all()
 
-    # Migrate items.emoji column (legacy)
+    # ── Legacy migrations ──────────────────────────────────────────────────────
+
+    # items.emoji
     try:
         cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("items")]
         if "emoji" not in cols:
@@ -375,7 +427,7 @@ with app.app_context():
     except Exception:
         pass
 
-    # Migrate locations.sort_order column (legacy)
+    # locations.sort_order
     try:
         loc_cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("locations")]
         if "sort_order" not in loc_cols:
@@ -386,14 +438,23 @@ with app.app_context():
     except Exception:
         pass
 
-    # Seed default locations
-    if Location.query.count() == 0:
-        db.session.add_all([
-            Location(name="冰箱",  icon="🧊", sort_order=0),
-            Location(name="冷凍庫", icon="❄️", sort_order=1),
-            Location(name="乾貨櫃", icon="🗄️", sort_order=2),
-        ])
-        db.session.commit()
+    # ── locations.user_id (per-user data isolation) ────────────────────────────
+    try:
+        loc_cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("locations")]
+        if "user_id" not in loc_cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE locations ADD COLUMN user_id INTEGER"))
+                # Assign existing locations to the first admin user
+                conn.execute(text(
+                    "UPDATE locations SET user_id = "
+                    "(SELECT id FROM users ORDER BY id LIMIT 1) "
+                    "WHERE user_id IS NULL"
+                ))
+                conn.commit()
+    except Exception:
+        pass
+
+    # ── Seed ──────────────────────────────────────────────────────────────────
 
     # Create initial admin user from env vars (only if users table is empty)
     if User.query.count() == 0:
@@ -406,6 +467,16 @@ with app.app_context():
                 is_admin=True,
             ))
             db.session.commit()
+
+    # Seed 3 default locations for any user that has none yet
+    for user in User.query.all():
+        if Location.query.filter_by(user_id=user.id).count() == 0:
+            db.session.add_all([
+                Location(name="冰箱",  icon="🧊", sort_order=0, user_id=user.id),
+                Location(name="冷凍庫", icon="❄️", sort_order=1, user_id=user.id),
+                Location(name="乾貨櫃", icon="🗄️", sort_order=2, user_id=user.id),
+            ])
+    db.session.commit()
 
 
 if __name__ == "__main__":
