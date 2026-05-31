@@ -4,7 +4,6 @@ from datetime import date, datetime
 from functools import wraps
 
 from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -39,7 +38,7 @@ def _hash_pw(password: str) -> str:
 def _verify_pw(password: str, stored_hash: str) -> bool:
     try:
         return _ph.verify(stored_hash, password)
-    except (VerifyMismatchError, InvalidHashError):
+    except Exception:
         return False
 
 
@@ -89,6 +88,7 @@ class User(db.Model):
     username      = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin      = db.Column(db.Boolean, default=False)
+    nickname      = db.Column(db.String(50), nullable=True)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
     locations     = db.relationship("Location", backref="owner", lazy=True,
                                     cascade="all, delete-orphan")
@@ -148,12 +148,15 @@ def login_page():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        user = User.query.filter_by(username=username).first()
-        if user and _verify_pw(password, user.password_hash):
-            session.permanent = True
-            session["user_id"] = user.id
-            return redirect(url_for("index"))
-        error = "帳號或密碼錯誤"
+        try:
+            user = User.query.filter_by(username=username).first()
+            if user and _verify_pw(password, user.password_hash):
+                session.permanent = True
+                session["user_id"] = user.id
+                return redirect(url_for("index"))
+            error = "帳號或密碼錯誤"
+        except Exception:
+            error = "伺服器暫時無法連線，請稍後再試"
     return render_template("login.html", error=error)
 
 
@@ -186,6 +189,7 @@ def index():
         "index.html",
         data_json=json.dumps(data, ensure_ascii=False),
         current_username=current_user.username if current_user else "",
+        current_nickname=current_user.nickname if current_user else None,
         is_admin=current_user.is_admin if current_user else False,
     )
 
@@ -215,6 +219,19 @@ def location_view(loc_id):
 @app.route("/health")
 def health():
     return "OK", 200
+
+
+# ── Change own nickname (any user) ───────────────────────────────────────────
+
+@app.route("/api/me/nickname", methods=["PUT"])
+@api_login_required
+def api_change_nickname():
+    me   = User.query.get(session["user_id"])
+    data = request.get_json() or {}
+    nick = data.get("nickname", "").strip()
+    me.nickname = nick or None   # 空字串存 NULL
+    db.session.commit()
+    return jsonify({"ok": True, "nickname": me.nickname})
 
 
 # ── Change own password (any user) ───────────────────────────────────────────
@@ -476,6 +493,16 @@ with app.app_context():
                     "(SELECT id FROM users ORDER BY id LIMIT 1) "
                     "WHERE user_id IS NULL"
                 ))
+                conn.commit()
+    except Exception:
+        pass
+
+    # users.nickname
+    try:
+        user_cols = [c["name"] for c in sqla_inspect(db.engine).get_columns("users")]
+        if "nickname" not in user_cols:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN nickname VARCHAR(50)"))
                 conn.commit()
     except Exception:
         pass

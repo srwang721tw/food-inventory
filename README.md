@@ -1,97 +1,117 @@
-# Food Inventory
+# PantryAI — 智慧食材庫存管家
 
-A mobile-first web app for tracking household food inventory. Describe newly purchased items in natural Chinese (typed or spoken), and the app automatically parses names, quantities, and expiry dates.
+> 用語音或自然語言輸入，AI 自動解析食物名稱、數量、到期日，零摩擦管理家庭食材庫存。
 
-**Production:** https://food-inventory-4ygl.onrender.com
-
----
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Voice / text input** | Speak or type e.g. "三包泡麵一個月後到期" — name, quantity, and expiry are parsed automatically |
-| **Batch NLP parsing** | One sentence can describe multiple items; review and edit each before saving |
-| **Expiry color coding** | Red (expired / ≤3 days), orange (≤7 days), green (safe), grey (no expiry set) |
-| **Swipe to delete** | On mobile: swipe an item row left to reveal a delete button. On desktop: trash icon appears on hover |
-| **Drag to reorder** | Drag the ≡ handle on a location — works with both touch and mouse |
-| **Stats quick-filter** | Tap "已過期" or "快過期" to expand all matching locations; tap again to collapse |
-| **Dark / light mode** | Toggle in the top-right corner: system default 🌓 → light ☀️ → dark 🌙 |
-| **Responsive layout** | Optimised for portrait and landscape on mobile |
-
-### Supported NLP input patterns
-
-```
-一瓶豆漿三天後到期、三包泡麵一個月後到期
-雞胸肉500克明天到期還有花椰菜一顆五天後到期
-蕃茄三顆絲瓜一條水蓮三包金針菇四包這些大概都是一個禮拜到期
-一包水蓮大約兩個禮拜內到期一罐可樂沒有期限
-有效期限到2026/7/1
-今天買了牛奶放冰箱
-```
+**Production：** https://food-inventory-4ygl.onrender.com
+**GitHub：** https://github.com/srwang721tw/food-inventory
 
 ---
 
-## Tech stack
+## Tech Stack
 
-| Layer | Choice |
-|-------|--------|
-| Backend | Python 3.12 + Flask 3.1 |
+| 層級 | 技術 |
+|------|------|
+| Backend | Python 3.12 · Flask 3.1 |
 | ORM | Flask-SQLAlchemy 3.1 |
-| Database | SQLite (local dev) / PostgreSQL (production) |
-| NLP | jieba + regex — local, zero cost, no API calls |
-| Voice | Web Speech API (browser-native; Chrome / Edge only) |
-| Frontend | Vanilla JS + CSS — no framework, no build step |
-| Hosting | Render (web service) + Neon (PostgreSQL) |
+| Database | Neon PostgreSQL（production）· SQLite（local dev）|
+| AI NLP | Google Gemini 2.5 Flash（免費配額）|
+| 本地 NLP | jieba + regex（fallback，零成本）|
+| Auth | Argon2 密碼雜湊（argon2-cffi）· Flask session |
+| Voice | Web Speech API（瀏覽器原生）|
+| Frontend | Vanilla JS + CSS（無框架、無建置步驟）|
+| Hosting | Render free tier + Neon free tier |
 
 ---
 
-## Local development
+## 專案亮點
+
+| 功能 | 說明 |
+|------|------|
+| **AI 語意解析** | Gemini 2.5 Flash 解析自然語言，失敗自動 fallback 到本地 regex |
+| **語音輸入** | 持續語音錄音，說完自動解析，支援 iOS Safari 和 Chrome |
+| **批次新增** | 一句話描述多項食物，自動拆分、預覽、可手動修改再加入庫存 |
+| **多使用者隔離** | 每個帳號有獨立的存放地點與食物庫存，資料完全隔離 |
+| **到期色碼** | 紅（過期或 ≤3 天）· 橘（≤7 天）· 綠（安全）|
+| **左滑刪除** | 手機左滑顯示刪除鍵；電腦 hover 顯示垃圾桶圖示 |
+| **拖拉排序** | 長按 ≡ 拖拉存放地點，touch + mouse 雙模式 |
+| **暗色模式** | 系統🌓 / 亮☀️ / 暗🌙 三段切換，偏好存於 localStorage |
+| **個人暱稱** | 使用者可設定暱稱，顯示於 header 標題 |
+| **Zero-cost** | 全部使用免費方案，不產生任何持續費用 |
+
+---
+
+## 快速上手（本地開發）
 
 ```bash
-# Activate the virtual environment
+# 啟用虛擬環境
 source .venv/bin/activate
 
-# Install dependencies
+# 安裝依賴
 pip install -r requirements.txt
 
-# Start the dev server (port 5001)
+# 啟動開發伺服器（port 5001 避免與系統衝突）
 PORT=5001 python app.py
 ```
 
-Open http://localhost:5001
+瀏覽器開啟 http://localhost:5001，用環境變數 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登入。
 
 ---
 
-## Deployment (Render + Neon)
+## 環境變數
 
-### Neon database
-
-1. Create a project at [neon.tech](https://neon.tech) (region: Singapore)
-2. Copy the connection string: `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
-
-### Render environment variables
-
-Go to your Render service → **Environment** and set:
-
-| Variable | Value |
-|----------|-------|
-| `DATABASE_URL` | Neon connection string |
-| `SECRET_KEY` | Any random string |
-
-Render redeploys automatically on save. Flask's `db.create_all()` creates all tables on first boot.
+| 變數 | 說明 | 必填 |
+|------|------|------|
+| `DATABASE_URL` | Neon PostgreSQL 連線字串 | 是（production）|
+| `SECRET_KEY` | Flask session 簽署金鑰 | 是 |
+| `ADMIN_USERNAME` | 初始 admin 帳號名稱 | 是（首次啟動）|
+| `ADMIN_PASSWORD` | 初始 admin 帳號密碼 | 是（首次啟動）|
+| `NLP_BACKEND` | `gemini`（建議）或 `regex`（預設）| 否 |
+| `GEMINI_API_KEY` | Google AI Studio API Key | `NLP_BACKEND=gemini` 時必填 |
+| `GEMINI_MODEL` | `gemini-2.5-flash`（預設）或 `gemini-2.5-flash-lite` | 否 |
+| `PORT` | 伺服器 port（預設 5000）| 否 |
 
 ---
 
-## API reference
+## 部署（Render + Neon）
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Main page (SSR — full data JSON embedded) |
-| `GET / POST /api/locations` | List / create locations |
-| `PUT / DELETE /api/locations/<id>` | Update / delete a location |
-| `POST /api/locations/reorder` | Persist drag-to-reorder result |
-| `POST /api/parse` | NLP parse text → `List[item_dict]` |
-| `POST /api/items/batch` | Batch create items |
-| `GET / PUT / DELETE /api/items/<id>` | Single item operations |
-| `GET /health` | Render health check |
+1. 在 [neon.tech](https://neon.tech) 建立 PostgreSQL 專案（地區：Singapore）
+2. 複製連線字串 `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
+3. 在 Render Dashboard → Environment 設定上表環境變數
+4. Push 到 GitHub，Render 自動部署
+
+---
+
+## 操作說明
+
+### 新增食物
+1. 點右下角 ➕ 按鈕
+2. 說出或打入食物描述（例：「三包泡麵一個月後到期」）
+3. 點「解析文字」→ 確認預覽 → 「加入庫存」
+
+### 管理帳號（Admin）
+- Header 右上角 👥 → 使用者管理
+- 可新增 / 刪除帳號（刪除帳號會一併清除該帳號所有資料）
+
+### 修改暱稱 / 密碼（所有使用者）
+- Header 右上角 👥 → 使用者管理 → 我的暱稱 / 修改密碼
+
+---
+
+## API 概覽
+
+| 端點 | 方法 | 說明 |
+|------|------|------|
+| `/login` | GET · POST | 登入頁 |
+| `/logout` | GET | 登出 |
+| `/api/me/nickname` | PUT | 更新自己的暱稱 |
+| `/api/me/password` | PUT | 更新自己的密碼（需驗證舊密碼）|
+| `/api/users` | GET · POST | 列出 / 新增使用者（admin）|
+| `/api/users/<id>` | DELETE | 刪除使用者（admin）|
+| `/api/locations` | GET · POST | 列出 / 新增存放地點 |
+| `/api/locations/<id>` | PUT · DELETE | 更新 / 刪除存放地點 |
+| `/api/locations/reorder` | POST | 更新排序 |
+| `/api/items` | POST | 新增食物 |
+| `/api/items/<id>` | GET · PUT · DELETE | 取得 / 更新 / 刪除食物 |
+| `/api/items/batch` | POST | 批次新增食物 |
+| `/api/parse` | POST | NLP 解析文字 → item dict 列表 |
+| `/health` | GET | Render healthcheck |

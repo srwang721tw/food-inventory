@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>王李夫妻共享食物庫存系統</title>
+  <title>PantryAI</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -341,7 +341,7 @@
 <!-- Header -->
 <div class="header">
   <div class="header-top">
-    <h1>🏠 王李夫妻<span>食物庫存</span></h1>
+    <h1>{{ current_nickname or '我的' }}<span> PantryAI</span></h1>
     <div style="display:flex;align-items:center;gap:6px">
       <button class="theme-btn" onclick="openUsersSheet()" title="使用者管理">👥</button>
       <button class="theme-btn" onclick="confirmLogout()" title="登出 {{ current_username }}">🚪</button>
@@ -451,6 +451,11 @@
   <div class="sheet">
     <div class="handle"></div>
     <h2>使用者管理</h2>
+
+    <!-- 暱稱設定（所有使用者） -->
+    <div class="slabel">我的暱稱</div>
+    <div class="fg"><label>暱稱</label><input type="text" id="nicknameInput" placeholder="輸入暱稱（顯示於頁面標題）" maxlength="20" autocapitalize="none" spellcheck="false"></div>
+    <button class="parse-btn" onclick="saveNickname()" style="margin-bottom:20px">儲存暱稱</button>
 
     <!-- 修改密碼（所有使用者） -->
     <div class="slabel">修改密碼</div>
@@ -1215,13 +1220,25 @@ function confirmLogout() {
   if (confirm('確定要登出嗎？')) window.location.href = '/logout';
 }
 
-// ── User management (admin only) ──────────────────────────────
+// ── User management ───────────────────────────────────────────
 const IS_ADMIN = {{ is_admin | tojson }};
+let CURRENT_NICKNAME = {{ (current_nickname or '')|tojson }};
 async function openUsersSheet() {
   showSheet('usersSheet');
+  document.getElementById('nicknameInput').value = CURRENT_NICKNAME;
   document.getElementById('curPassword').value = '';
   document.getElementById('newPasswordMe').value = '';
   if (IS_ADMIN) await refreshUsersList();
+}
+async function saveNickname() {
+  const nick = document.getElementById('nicknameInput').value.trim();
+  const r = await fetch('/api/me/nickname', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nickname: nick})});
+  const data = await r.json();
+  if (!r.ok) { toast(data.error || '儲存失敗', 'err'); return; }
+  CURRENT_NICKNAME = nick;
+  toast('暱稱已更新');
+  const h1 = document.querySelector('.header h1');
+  if (h1) h1.innerHTML = `${nick || '我的'}<span> PantryAI</span>`;
 }
 async function refreshUsersList() {
   const r = await fetch('/api/users');
@@ -1272,5 +1289,9 @@ async function changePassword() {
 const voiceBtn = document.getElementById('voiceBtn');
 render();
 </script>
+
+<footer style="text-align:center;padding:20px 0 44px;font-size:11px;color:var(--text3)">
+  © 2025 <a href="https://github.com/srwang721tw" target="_blank" style="color:var(--text3);text-decoration:none">srwang721tw</a>
+</footer>
 </body>
 </html>

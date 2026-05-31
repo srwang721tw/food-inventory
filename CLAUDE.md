@@ -30,100 +30,199 @@ gunicorn app:app --bind 0.0.0.0:$PORT
 
 ## 架構說明
 
-這是一個以手機操作為主的家庭食物庫存 Web App。技術棧為 Flask + SQLAlchemy + Vanilla JS，無建置步驟。
+這是一個以手機操作為主的家庭食物庫存 Web App，品牌名稱為 **PantryAI**。技術棧為 Flask + SQLAlchemy + Vanilla JS，無建置步驟。
 
-### 後端（`app.py`）
+---
 
-三個 SQLAlchemy Model：
-- **`User`**：使用者帳號。欄位有 username（unique）、password_hash（Argon2）、is_admin、created_at。
-- **`Location`**：存放地點（如冰箱、冷凍庫）。有多個 `Item`，cascade delete。
-- **`Item`**：食物項目，欄位有 name、emoji、quantity、unit、purchase_date、expiry_date、notes、FK 指向 Location。
+## 後端（`app.py`）
 
-Auth 機制：
-- Argon2 密碼雜湊（`argon2-cffi`），`_hash_pw()` / `_verify_pw()` helper。
-- `login_required` decorator：未登入頁面路由 → redirect `/login`。
-- `api_login_required` decorator：未登入 API 路由 → 401 JSON。
-- 初始 admin 帳號由 `ADMIN_USERNAME` + `ADMIN_PASSWORD` 環境變數在 `db.create_all()` 後自動建立（users 表為空時）。
+### 資料模型
 
-路由：
-- `GET|POST /login` — 登入頁（HTML form POST，非 AJAX）
-- `GET /logout` — 清除 session，redirect 到 `/login`
-- `GET /` — 渲染 `index.html`（含 `data_json`、`current_username`、`is_admin`）
-- `GET /location/<id>` — 渲染 `location.html`（legacy，目前未使用）
-- `GET /health` — Render healthcheck（不需登入）
-- REST API（全部需登入）：
-  - `GET|POST /api/users` — 列出/新增使用者（admin only）
-  - `DELETE /api/users/<id>` — 刪除使用者（admin only，不能刪自己）
-  - `GET|POST /api/locations`、`PUT|DELETE /api/locations/<id>`、`POST /api/locations/reorder`
-  - `GET|PUT|DELETE /api/items/<id>`、`POST /api/items`、`POST /api/items/batch`
-  - `POST /api/parse` — NLP 解析，根據 `NLP_BACKEND` env var 選擇 regex 或 Gemini
+**`User`**
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `id` | Integer PK | |
+| `username` | String(50) unique | 帳號名稱 |
+| `password_hash` | String(200) | Argon2 hash（含 salt，~95–130 chars）|
+| `is_admin` | Boolean | 管理員旗標，預設 False |
+| `nickname` | String(50) nullable | 使用者暱稱，顯示於 header |
+| `created_at` | DateTime | |
+| `locations` | relationship | cascade delete-orphan → Location |
 
-資料庫：本地用 SQLite（`instance/food_inventory.db`）；生產用 Neon PostgreSQL（`DATABASE_URL` 環境變數）。Schema migration 在啟動時 inline 執行。
+**`Location`**
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `id` | Integer PK | |
+| `user_id` | Integer FK(users.id) | 所屬使用者（per-user 隔離）|
+| `name` | String(100) | 地點名稱 |
+| `icon` | String(10) | Emoji 圖示 |
+| `sort_order` | Integer | 拖拉排序位置 |
+| `created_at` | DateTime | |
+| `items` | relationship | cascade delete-orphan → Item |
 
-### NLP 模組（`nlp.py`）
+**`Item`**
+| 欄位 | 型別 | 說明 |
+|------|------|------|
+| `id` | Integer PK | |
+| `location_id` | Integer FK(locations.id) | |
+| `name` | String(200) | |
+| `emoji` | String(10) | 預設 🍱 |
+| `quantity` | Float | 預設 1 |
+| `unit` | String(50) | 預設「個」|
+| `purchase_date` | Date nullable | |
+| `expiry_date` | Date nullable | |
+| `notes` | Text | |
+| `created_at` / `updated_at` | DateTime | |
 
-純本地的中文食物文字解析器，使用 jieba 分詞 + regex 抽取日期/數量。不呼叫任何外部 API。
+### Auth 機制
+
+- Argon2 密碼雜湊（`argon2-cffi`），`_hash_pw()` / `_verify_pw()` helper
+- `_verify_pw` 捕捉所有 Exception（防止 Argon2 邊緣情況觸發 500）
+- `login_required` decorator：未登入頁面路由 → redirect `/login`
+- `api_login_required` decorator：未登入 API 路由 → 401 JSON
+- 初始 admin 帳號由 `ADMIN_USERNAME` + `ADMIN_PASSWORD` 環境變數在 `db.create_all()` 後自動建立（users 表為空時）
+- 新建帳號時自動 seed 3 個預設存放地點（冰箱、冷凍庫、乾貨櫃）
+
+### 所有路由
+
+| 路由 | 方法 | 登入 | 說明 |
+|------|------|------|------|
+| `/login` | GET · POST | 否 | 登入頁（form POST，非 AJAX）|
+| `/logout` | GET | 否 | 清除 session，redirect `/login` |
+| `/` | GET | 是 | 渲染 `index.html`（含 data_json、current_username、current_nickname、is_admin）|
+| `/location/<id>` | GET | 是 | Legacy 地點頁（已棄用）|
+| `/health` | GET | 否 | Render healthcheck |
+| `/api/me/nickname` | PUT | 是 | 更新自己的暱稱（空字串 → NULL）|
+| `/api/me/password` | PUT | 是 | 更新自己的密碼（需驗證舊密碼，min 4 字元）|
+| `/api/users` | GET | 是 admin | 列出所有使用者 |
+| `/api/users` | POST | 是 admin | 新增使用者（同時 seed 3 個預設地點）|
+| `/api/users/<id>` | DELETE | 是 admin | 刪除使用者（不能刪自己；cascade 清除所有地點與食物）|
+| `/api/locations` | GET · POST | 是 | 列出 / 新增存放地點 |
+| `/api/locations/<id>` | PUT · DELETE | 是 | 更新 / 刪除存放地點 |
+| `/api/locations/reorder` | POST | 是 | 更新排序（`[{id, sort_order}, ...]`）|
+| `/api/items` | POST | 是 | 新增單一食物 |
+| `/api/items/<id>` | GET · PUT · DELETE | 是 | 取得 / 更新 / 刪除食物 |
+| `/api/items/batch` | POST | 是 | 批次新增食物（`[item_dict, ...]`，含 location_hint 自動比對）|
+| `/api/parse` | POST | 是 | NLP 解析文字 → item dict 列表 |
+
+### 所有權驗證
+
+- `_own_location(loc_id)` — 查詢 Location，若 `user_id != session["user_id"]` 則 abort(403)
+- `_own_item(item_id)` — 查詢 Item，透過 `item.location.user_id` 驗證所有權
+
+### 登入穩定性
+
+login POST handler 用 try/except 包覆 DB 查詢，捕捉 Neon 冷啟動等暫時性連線錯誤，改回傳「伺服器暫時無法連線，請稍後再試」而非 500。
+
+### Schema Migration（啟動時 inline 執行）
+
+| Migration | 條件 | 動作 |
+|-----------|------|------|
+| `items.emoji` | 欄位不存在 | ALTER TABLE 加 VARCHAR(10) DEFAULT '🍱' |
+| `locations.sort_order` | 欄位不存在 | ALTER TABLE 加 INTEGER DEFAULT 0，UPDATE SET sort_order=id |
+| `locations.user_id` | 欄位不存在 | ALTER TABLE 加 INTEGER，UPDATE 指派給第一個 user |
+| `users.nickname` | 欄位不存在 | ALTER TABLE 加 VARCHAR(50) |
+
+全部包在 `try/except Exception: pass` 中，對 SQLite 和 PostgreSQL 均相容。
+
+---
+
+## NLP 模組（`nlp.py`）
+
+純本地中文食物文字解析器，使用 jieba 分詞 + regex。不呼叫外部 API。
 
 Entry points：
 - `parse_food_text(text)` → 單一 item dict
 - `parse_multiple_foods(text)` → item dict 列表（透過 `_split_items` 處理多項）
 
-解析欄位：`name`、`quantity`、`unit`、`purchase_date`、`expiry_date`、`location_hint`。日期支援絕對日期（YYYY年M月D日、YYYY/M/D）、相對天數/週/月、自然語言片語（昨天、下週、三天後到期等）。
+解析欄位：`name`、`quantity`、`unit`、`purchase_date`、`expiry_date`、`location_hint`。
+日期支援絕對（YYYY年M月D日、YYYY/M/D）、相對天數/週/月、自然語言（昨天、下週、三天後到期）。
 
-### Gemini NLP 模組（`gemini_nlp.py`）
+**關鍵注意事項：**
+- **Regex 順序：** first-match-wins。有前綴 pattern（`保存N週`）**必須放在**無前綴版本（`N週`）之前
+- **`_split_items()` connector guard：** `還有`/`另外`/`以及` 當右側為純時間表達式時**不分割**
+- **全局到期日傳播：** 先對完整文字取全局 `expiry_date`，再套用至各無個別到期日的項目
 
-使用 Google `google-genai` SDK 呼叫 Gemini 2.0/2.5 Flash。只在 `NLP_BACKEND=gemini` 且 `GEMINI_API_KEY` 已設定時啟用。
+---
 
-Entry point：
-- `parse_with_gemini(text)` → item dict 列表（格式與 `parse_multiple_foods()` 相同）
+## Gemini NLP 模組（`gemini_nlp.py`）
+
+使用 `google-genai` SDK 呼叫 Gemini 2.5 Flash。只在 `NLP_BACKEND=gemini` 且 `GEMINI_API_KEY` 已設定時啟用。
+
+Entry point：`parse_with_gemini(text)` → item dict 列表（格式與 `parse_multiple_foods()` 相同）
 
 System prompt 每次動態注入今天日期，要求回傳純 JSON 陣列（`response_mime_type='application/json'`，`temperature=0`）。
 
-### 前端（templates/）
+**Fallback 邏輯（`/api/parse`）：**
+- `NLP_BACKEND=gemini`：先嘗試 Gemini，任何 Exception（429、空結果 ValueError、網路錯誤）→ 靜默 fallback 到 regex
+- `NLP_BACKEND=regex`：直接使用 regex
 
-**`login.html`** — 獨立登入頁（不繼承 base.html）。iOS 風格卡片式設計，同樣支援深/淺色模式。`<form method="POST">`（非 AJAX，確保 JS 失效時仍可登入）。
+---
 
-**`base.html`** — 共用 CSS 設計系統（CSS 變數、Sheet/Overlay、表單、按鈕、Toast、Emoji grid、語音按鈕）與共用 JS（`toast()`、`showSheet()`、`hideSheet()`）。由 `location.html` 繼承。
+## 前端（`templates/`）
 
-**`index.html`** — 獨立 SPA（**不**繼承 `base.html`，自帶 inline 樣式）。渲染地點 accordion 列表，每個 accordion 內含食物卡片。所有狀態存在 `DATA` 物件（由 server-rendered `data_json` 初始化）。Mutation 流程：call API → 更新 `DATA` → 呼叫 `render()` → 顯示 toast（無整頁重新載入）。
+**`login.html`** — 獨立登入頁（不繼承任何 template）。iOS 風格卡片，App 名稱 PantryAI，副標「智慧食材庫存管家」。`<form method="POST">` 非 AJAX。
 
-Header 右側按鈕（由左到右）：👥 使用者管理（admin 才顯示，Jinja2 `{% if is_admin %}`）、🚪 登出、🌓 主題切換。
+**`index.html`** — 獨立 SPA，不繼承 base.html，自帶 inline 樣式。
 
-**`location.html`** — legacy 地點詳細頁面（繼承 `base.html`）。目前未使用，被 `index.html` 的 accordion SPA 取代。保留但不維護。
+所有狀態存在 `DATA` 物件（由 server-rendered `data_json` 初始化）。
 
-### NLP 注意事項
+Mutation 流程：call API → 更新 `DATA` → `render()` → toast（無整頁重載）
 
-- **Regex 順序：** pattern 採用 first-match-wins。有前綴的 pattern（`保存N週`、`可以放N天`）**必須放在** 無前綴版本（`N週`、`N天`）之前。
-- **`_split_items()` 的 connector guard：** `還有`/`另外`/`以及` 連接詞用於分割多項食物，但當右側是純時間表達式（如「還有五天到期」）時**不應分割**。
-- **`_split_items()` 的雙模式分割（rule 4）：** qty-first → 在 NUM+UNIT 之前分割；name-first → 在 NUM+UNIT 之後分割，尾部全局 context 丟棄。
-- **全局到期日傳播：** `parse_multiple_foods` 在分割前先對完整文字呼叫 `parse_food_text` 取得全局 `expiry_date`，再傳播給沒有個別到期日的各項目。
+**Header 右側按鈕（由左到右）：**
+- 👥 使用者管理（所有使用者可見）
+- 🚪 登出
+- 🌓 主題切換
 
-### JS 注意事項
+**Header 標題：** `{current_nickname or '我的'} PantryAI`（`current_nickname` 由 Jinja2 server-render）
 
-- **殘留的 event listener：** 移除 HTML 元素時，若對應的 JS ref 沒有一併移除，會靜默中斷整個 JS 執行。
-- **401 處理：** session 過期時 API 回傳 401，前端應導向 `/login`（目前 fetch 未全域攔截 401，如需改進可加 interceptor）。
+**使用者管理 Sheet 內容：**
+- **我的暱稱**（所有使用者）：input + 儲存 → `PUT /api/me/nickname` → 即時更新 header
+- **修改密碼**（所有使用者）：目前密碼 + 新密碼 → `PUT /api/me/password`
+- **現有帳號**（admin only，Jinja2 `{% if is_admin %}`）：列表 + 🗑 刪除
+- **新增帳號**（admin only）：帳號 + 密碼 → `POST /api/users`
 
-### UI 設計規範
+**JS 全域變數（server-rendered）：**
+- `DATA` — 所有 locations 和 items
+- `IS_ADMIN` — Boolean
+- `CURRENT_NICKNAME` — 字串（可為空）
+
+**`location.html`** — Legacy，已棄用，保留但不維護。
+
+---
+
+## UI 設計規範
 
 - 以手機操作為主，max-width 430px（橫式放寬至 700px），iOS 風格設計
-- 深色/淺色/系統三段切換；`html.dark` class 控制 CSS 變數
-- 所有 mutation 為樂觀更新：先更新 `DATA` → `render()` → 顯示 toast（無整頁重新載入）
-- 食物排序規則：到期日最近優先，無到期日的排最後，同到期日按名稱排序
-- 到期色碼：紅（已過期或 ≤3 天）、橘（≤7 天）、綠（>7 天）
-- 左滑刪除（手機）：刪除鍵以 `position: absolute; right: -76px` 放在 card 內部，跟著 card transform 移動；`overflow: hidden` 保證初始隱藏。電腦版改為 hover 時顯示垃圾桶圖示
-- 拖拉排序：≡ handle 同時綁定 `touchstart`（手機）和 `mousedown`（電腦），共用 `_dragStart / _dragMove / _dragEnd` 邏輯，建立 ghost clone，排序結果 POST 到 `/api/locations/reorder`
-- 點擊目標：只有 `.item-emoji` 和 `.item-info` 有 `onclick="openEditItem(...)"`，其餘區域（badge、空白）不觸發編輯。手機左滑後 touchend 會 `e.preventDefault()` 阻止 click 事件
-- 語音輸入：`recog.continuous = true`，持續錄音直到使用者手動按停止
+- 深色/淺色/系統三段切換；`html.dark` class 控制 CSS 變數；偏好存於 localStorage
+- 所有 mutation 為樂觀更新：先更新 `DATA` → `render()` → toast
+- 食物排序：到期日最近優先，無到期日排最後，同到期日按名稱
+- 到期色碼：紅（過期或 ≤3 天）、橘（≤7 天）、綠（>7 天）
+- 左滑刪除（手機）：刪除鍵 `position: absolute; right: -76px`，`overflow: hidden` 初始隱藏；電腦版 hover 顯示垃圾桶
+- 拖拉排序：≡ handle 綁定 `touchstart`（手機）+ `mousedown`（電腦），共用 `_dragStart / _dragMove / _dragEnd`，ghost clone，POST 到 `/api/locations/reorder`
+- 點擊目標：只有 `.item-emoji` 和 `.item-info` 觸發 `openEditItem()`；手機左滑後 touchend `e.preventDefault()` 阻止 click
+- 語音輸入：`recog.continuous = true`，持續錄音直到使用者手動停止
+- iOS date input：須加 `-webkit-appearance: none; display: block; width: 100%; box-sizing: border-box` 才能在真機 Safari 對齊寬度
 
-### 環境變數
+---
+
+## JS 注意事項
+
+- **殘留 event listener：** 移除 HTML 元素時，若對應的 JS ref 沒有一併移除，會靜默中斷整個 JS 執行
+- **401 處理：** session 過期時 API 回傳 401，前端應導向 `/login`（目前 fetch 未全域攔截 401）
+- **swipe-delete touch 處理：** `initSwipe()` 在 touchstart 儲存 `startTarget`，touchend 判斷 `startTarget.closest('.swipe-del')` 決定是否 preventDefault
+
+---
+
+## 環境變數
 
 | 變數 | 說明 |
 |------|------|
-| `DATABASE_URL` | Neon PostgreSQL 連線字串。不設定時退回 SQLite（僅限本地開發）。 |
+| `DATABASE_URL` | Neon PostgreSQL 連線字串。不設定時退回 SQLite（僅限本地開發）|
 | `SECRET_KEY` | Flask session 金鑰 |
-| `PORT` | 伺服器 port（預設 5000；本地建議用 5001） |
-| `ADMIN_USERNAME` | 初始 admin 帳號名稱（users 表為空時自動建立） |
+| `PORT` | 伺服器 port（預設 5000；本地建議用 5001）|
+| `ADMIN_USERNAME` | 初始 admin 帳號名稱（users 表為空時自動建立）|
 | `ADMIN_PASSWORD` | 初始 admin 帳號密碼 |
-| `NLP_BACKEND` | `regex`（預設）或 `gemini`（需同時設 `GEMINI_API_KEY`） |
-| `GEMINI_API_KEY` | Google AI Studio API Key（從 aistudio.google.com 取得，`AIza` 開頭） |
-| `GEMINI_MODEL` | `gemini-2.5-flash`（預設）或 `gemini-2.5-flash-lite`（最省配額） |
+| `NLP_BACKEND` | `regex`（預設）或 `gemini`（需同時設 `GEMINI_API_KEY`）|
+| `GEMINI_API_KEY` | Google AI Studio API Key（aistudio.google.com 取得）|
+| `GEMINI_MODEL` | `gemini-2.5-flash`（預設）或 `gemini-2.5-flash-lite`（最省配額）|
