@@ -55,7 +55,7 @@ def _validate_items(items: list) -> list:
 def parse_with_gemini(text: str) -> list[dict]:
     """Parse food text using Gemini Flash. Returns same format as parse_multiple_foods()."""
     api_key    = os.environ.get('GEMINI_API_KEY', '')
-    model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+    model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 
     client = genai.Client(api_key=api_key)
 

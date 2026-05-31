@@ -126,4 +126,4 @@ Header 右側按鈕（由左到右）：👥 使用者管理（admin 才顯示�
 | `ADMIN_PASSWORD` | 初始 admin 帳號密碼 |
 | `NLP_BACKEND` | `regex`（預設）或 `gemini`（需同時設 `GEMINI_API_KEY`） |
 | `GEMINI_API_KEY` | Google AI Studio API Key（從 aistudio.google.com 取得，`AIza` 開頭） |
-| `GEMINI_MODEL` | `gemini-2.0-flash`（預設）或 `gemini-2.5-flash` |
+| `GEMINI_MODEL` | `gemini-2.5-flash`（預設）或 `gemini-2.5-flash-lite`（最省配額） |
