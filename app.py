@@ -255,6 +255,12 @@ def api_users():
             return jsonify({"error": "帳號已存在"}), 409
         user = User(username=username, password_hash=_hash_pw(password))
         db.session.add(user)
+        db.session.flush()  # get user.id before commit
+        db.session.add_all([
+            Location(name="冰箱",  icon="🧊", sort_order=0, user_id=user.id),
+            Location(name="冷凍庫", icon="❄️", sort_order=1, user_id=user.id),
+            Location(name="乾貨櫃", icon="🗄️", sort_order=2, user_id=user.id),
+        ])
         db.session.commit()
         return jsonify({"id": user.id, "username": user.username, "is_admin": user.is_admin}), 201
     users = User.query.order_by(User.created_at).all()

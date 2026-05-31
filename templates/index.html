@@ -654,7 +654,8 @@ function filterByStatus(type) {
 function renderLocs() {
   const el = document.getElementById('locsList');
   if (!DATA.locations.length) {
-    el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點，點下方 ＋ 新增</p></div>`;
+    el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點</p></div>` +
+      `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
     return;
   }
   el.innerHTML = DATA.locations.map(locHTML).join('') +
