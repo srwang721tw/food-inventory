@@ -250,8 +250,8 @@
       color: var(--text); background: var(--bg); outline: none;
       transition: border-color 0.14s, background 0.2s, color 0.2s;
     }
-    /* iOS Safari date input: lock to exactly 100% width */
-    .fg input[type="date"] { display: block; width: 100%; min-width: 100%; max-width: 100%; box-sizing: border-box; }
+    /* iOS Safari: -webkit-appearance:none forces CSS-controlled sizing; date picker still works */
+    .fg input[type="date"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
     .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--primary); }
     .fg textarea { resize: none; min-height: 62px; line-height: 1.5; }
     .fg input::placeholder, .fg textarea::placeholder { color: var(--text3); }
