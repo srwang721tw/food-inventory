@@ -217,6 +217,26 @@ def health():
     return "OK", 200
 
 
+# ── Change own password (any user) ───────────────────────────────────────────
+
+@app.route("/api/me/password", methods=["PUT"])
+@api_login_required
+def api_change_password():
+    me   = User.query.get(session["user_id"])
+    data = request.get_json() or {}
+    cur  = data.get("current_password", "")
+    new  = data.get("new_password", "").strip()
+    if not cur or not new:
+        return jsonify({"error": "請填寫目前密碼和新密碼"}), 400
+    if len(new) < 4:
+        return jsonify({"error": "新密碼至少需要 4 個字元"}), 400
+    if not _verify_pw(cur, me.password_hash):
+        return jsonify({"error": "目前密碼不正確"}), 400
+    me.password_hash = _hash_pw(new)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 # ── User management API (admin only) ─────────────────────────────────────────
 
 @app.route("/api/users", methods=["GET", "POST"])

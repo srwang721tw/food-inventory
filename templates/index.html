@@ -343,7 +343,7 @@
   <div class="header-top">
     <h1>🏠 王李夫妻<span>食物庫存</span></h1>
     <div style="display:flex;align-items:center;gap:6px">
-      {% if is_admin %}<button class="theme-btn" onclick="openUsersSheet()" title="使用者管理">👥</button>{% endif %}
+      <button class="theme-btn" onclick="openUsersSheet()" title="使用者管理">👥</button>
       <button class="theme-btn" onclick="confirmLogout()" title="登出 {{ current_username }}">🚪</button>
       <button class="theme-btn" id="themeBtn" onclick="cycleTheme()" title="切換主題"></button>
     </div>
@@ -451,14 +451,27 @@
   <div class="sheet">
     <div class="handle"></div>
     <h2>使用者管理</h2>
+
+    <!-- 修改密碼（所有使用者） -->
+    <div class="slabel">修改密碼</div>
+    <div class="fg"><label>目前密碼</label><input type="password" id="curPassword" placeholder="輸入目前密碼" autocomplete="current-password"></div>
+    <div class="fg"><label>新密碼</label><input type="password" id="newPasswordMe" placeholder="輸入新密碼（至少 4 字元）" autocomplete="new-password"></div>
+    <button class="parse-btn" onclick="changePassword()" style="margin-bottom:20px">儲存新密碼</button>
+
+    {% if is_admin %}
+    <!-- 現有帳號（管理員） -->
     <div class="slabel">現有帳號</div>
     <div id="usersList" style="margin-bottom:18px"></div>
+
+    <!-- 新增帳號（管理員） -->
     <div class="slabel">新增帳號</div>
     <div class="fg"><label>帳號</label><input type="text" id="newUsername" placeholder="帳號名稱" autocapitalize="none" spellcheck="false"></div>
     <div class="fg"><label>密碼</label><input type="password" id="newPassword" placeholder="設定密碼"></div>
+    <button class="parse-btn" onclick="addUser()" style="margin-bottom:20px">新增帳號</button>
+    {% endif %}
+
     <div class="btn-row">
       <button class="btn btn-c" onclick="hideSheet('usersSheet')">關閉</button>
-      <button class="btn btn-p" onclick="addUser()">新增帳號</button>
     </div>
   </div>
 </div>
@@ -1202,9 +1215,12 @@ function confirmLogout() {
 }
 
 // ── User management (admin only) ──────────────────────────────
+const IS_ADMIN = {{ is_admin | tojson }};
 async function openUsersSheet() {
   showSheet('usersSheet');
-  await refreshUsersList();
+  document.getElementById('curPassword').value = '';
+  document.getElementById('newPasswordMe').value = '';
+  if (IS_ADMIN) await refreshUsersList();
 }
 async function refreshUsersList() {
   const r = await fetch('/api/users');
@@ -1234,10 +1250,21 @@ async function addUser() {
   await refreshUsersList();
 }
 async function deleteUser(id, username) {
-  if (!confirm(`確定刪除帳號「${username}」嗎？`)) return;
+  if (!confirm(`確定刪除帳號「${username}」？\n\n此帳號下的所有存放地點和食物資料都會一併刪除，無法恢復。`)) return;
   const r = await fetch(`/api/users/${id}`,{method:'DELETE'});
-  if (r.ok) { toast('已刪除「'+username+'」'); await refreshUsersList(); }
+  if (r.ok) { toast('已刪除帳號「'+username+'」及其所有資料'); await refreshUsersList(); }
   else { const d = await r.json(); toast(d.error||'刪除失敗','err'); }
+}
+async function changePassword() {
+  const cur = document.getElementById('curPassword').value;
+  const nw  = document.getElementById('newPasswordMe').value.trim();
+  if (!cur || !nw) { toast('請填寫目前密碼和新密碼','err'); return; }
+  const r = await fetch('/api/me/password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:cur,new_password:nw})});
+  const data = await r.json();
+  if (!r.ok) { toast(data.error||'修改失敗','err'); return; }
+  document.getElementById('curPassword').value = '';
+  document.getElementById('newPasswordMe').value = '';
+  toast('密碼已更新');
 }
 
 // ── Boot ──────────────────────────────────────────────────────
