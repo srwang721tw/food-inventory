@@ -62,7 +62,8 @@ def _model_name() -> str:
 
 def parse_with_gemini(text: str) -> list[dict]:
     """Parse food text using Gemini Flash. Returns same format as parse_multiple_foods()."""
-    response = _client().models.generate_content(
+    client = _client()  # keep reference — GC-ing the client closes the HTTP transport
+    response = client.models.generate_content(
         model=_model_name(),
         contents=text,
         config=types.GenerateContentConfig(
@@ -96,6 +97,8 @@ def parse_with_gemini(text: str) -> list[dict]:
 
 def suggest_recipe(items: list) -> str:
     """Given a list of Item ORM objects, ask Gemini to suggest one recipe."""
+    # Cap at 30 items to keep prompt short
+    items = items[:30]
     inventory = '\n'.join(
         f'- {i.name} × {i.quantity}{i.unit}' for i in items
     )
@@ -104,7 +107,8 @@ def suggest_recipe(items: list) -> str:
         '請根據以上食材推薦一道可以製作的料理，'
         '給出菜名和簡要步驟（3-5個步驟）。請用繁體中文回覆。'
     )
-    response = _client().models.generate_content(
+    client = _client()  # keep reference — GC-ing the client closes the HTTP transport
+    response = client.models.generate_content(
         model=_model_name(),
         contents=prompt,
         config=types.GenerateContentConfig(temperature=0.7),

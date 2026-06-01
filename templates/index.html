@@ -259,9 +259,10 @@
     /* Password show/hide wrapper */
     .pw-wrap { position: relative; }
     .pw-wrap input { padding-right: 42px; width: 100%; box-sizing: border-box; }
-    .pw-eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; cursor: pointer; font-size: 15px;
-      color: var(--text3); padding: 4px; line-height: 1; }
+    .pw-eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--text3); padding: 4px; display: flex; align-items: center; }
+    .pw-eye svg { display: block; }
     /* Item drag handle */
     .item-drag-handle {
       font-size: 16px; color: var(--text3); cursor: grab; padding: 0 6px 0 2px;
@@ -480,9 +481,9 @@
 
     <!-- 修改密碼（所有使用者） -->
     <div class="slabel">修改密碼</div>
-    <div class="fg"><label>目前密碼</label><div class="pw-wrap"><input type="password" id="curPassword" placeholder="輸入目前密碼" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw('curPassword',this)">👁</button></div></div>
-    <div class="fg"><label>新密碼</label><div class="pw-wrap"><input type="password" id="newPasswordMe" placeholder="輸入新密碼（至少 4 字元）" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('newPasswordMe',this)">👁</button></div></div>
-    <div class="fg"><label>確認新密碼</label><div class="pw-wrap"><input type="password" id="confirmPasswordMe" placeholder="再次輸入新密碼" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('confirmPasswordMe',this)">👁</button></div></div>
+    <div class="fg"><label>目前密碼</label><div class="pw-wrap"><input type="password" id="curPassword" placeholder="輸入目前密碼" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw('curPassword',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="fg"><label>新密碼</label><div class="pw-wrap"><input type="password" id="newPasswordMe" placeholder="輸入新密碼（至少 4 字元）" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('newPasswordMe',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="fg"><label>確認新密碼</label><div class="pw-wrap"><input type="password" id="confirmPasswordMe" placeholder="再次輸入新密碼" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('confirmPasswordMe',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <button class="parse-btn" onclick="changePassword()" style="margin-bottom:20px">儲存新密碼</button>
 
     {% if is_admin %}
@@ -493,8 +494,8 @@
     <!-- 新增帳號（管理員） -->
     <div class="slabel">新增帳號</div>
     <div class="fg"><label>帳號</label><input type="text" id="newUsername" placeholder="帳號名稱" autocapitalize="none" spellcheck="false"></div>
-    <div class="fg"><label>密碼</label><div class="pw-wrap"><input type="password" id="newPassword" placeholder="設定密碼"><button class="pw-eye" type="button" onclick="togglePw('newPassword',this)">👁</button></div></div>
-    <div class="fg"><label>確認密碼</label><div class="pw-wrap"><input type="password" id="confirmPassword" placeholder="再次輸入密碼"><button class="pw-eye" type="button" onclick="togglePw('confirmPassword',this)">👁</button></div></div>
+    <div class="fg"><label>密碼</label><div class="pw-wrap"><input type="password" id="newPassword" placeholder="設定密碼"><button class="pw-eye" type="button" onclick="togglePw('newPassword',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <div class="fg"><label>確認密碼</label><div class="pw-wrap"><input type="password" id="confirmPassword" placeholder="再次輸入密碼"><button class="pw-eye" type="button" onclick="togglePw('confirmPassword',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
     <button class="parse-btn" onclick="addUser()" style="margin-bottom:20px">新增帳號</button>
     {% endif %}
 
@@ -1345,10 +1346,12 @@ function confirmLogout() {
 // ── User management ───────────────────────────────────────────
 let CURRENT_NICKNAME = {{ (current_nickname or '')|tojson }};
 
+const _EYE_OPEN = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const _EYE_OFF  = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 function togglePw(id, btn) {
   const inp = document.getElementById(id);
   inp.type = inp.type === 'password' ? 'text' : 'password';
-  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+  btn.innerHTML = inp.type === 'password' ? _EYE_OPEN : _EYE_OFF;
 }
 async function openUsersSheet() {
   showSheet('usersSheet');
