@@ -113,8 +113,8 @@ def suggest_recipe(items: list) -> str:
     ingredients = '、'.join(i.name for i in chosen)
     prompt = (
         f'我有這些食材：{ingredients}。\n'
-        '請根據以上食材推薦一道可以製作的料理，'
-        '給出菜名和簡要步驟（3-5個步驟）。請用繁體中文回覆。'
+        '請根據以上食材推薦一道料理，給出菜名和簡要步驟。'
+        '全文限 150 字以內，請用繁體中文回覆。'
     )
     client = _client()  # keep reference — GC-ing the client closes the HTTP transport
     last_err: Exception | None = None
