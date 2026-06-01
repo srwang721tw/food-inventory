@@ -120,6 +120,7 @@ class Item(db.Model):
     purchase_date = db.Column(db.Date)
     expiry_date   = db.Column(db.Date)
     notes         = db.Column(db.Text, default="")
+    sort_order    = db.Column(db.Integer, default=0)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at    = db.Column(db.DateTime, default=datetime.utcnow,
                               onupdate=datetime.utcnow)
@@ -135,6 +136,7 @@ class Item(db.Model):
             "purchase_date": self.purchase_date.isoformat() if self.purchase_date else None,
             "expiry_date":   self.expiry_date.isoformat()   if self.expiry_date   else None,
             "notes":         self.notes or "",
+            "sort_order":    self.sort_order,
         }
 
 
@@ -177,20 +179,21 @@ def index():
                        Location.sort_order, Location.created_at).all()
     data = {"locations": []}
     for loc in locations:
-        items = sorted(loc.items, key=lambda i: (
-            i.expiry_date is None,
-            i.expiry_date or date.max,
-            i.name,
-        ))
+        items = sorted(loc.items, key=lambda i: (i.sort_order, i.id))
         entry = loc.to_dict()
         entry["items"] = [i.to_dict() for i in items]
         data["locations"].append(entry)
+    is_gemini = (
+        os.environ.get("NLP_BACKEND", "regex").lower() == "gemini"
+        and bool(os.environ.get("GEMINI_API_KEY"))
+    )
     return render_template(
         "index.html",
         data_json=json.dumps(data, ensure_ascii=False),
         current_username=current_user.username if current_user else "",
         current_nickname=current_user.nickname if current_user else None,
         is_admin=current_user.is_admin if current_user else False,
+        is_gemini=is_gemini,
     )
 
 
@@ -343,6 +346,39 @@ def api_location(loc_id):
     return jsonify(loc.to_dict())
 
 
+# ── Items reorder API ─────────────────────────────────────────────────────────
+
+@app.route("/api/items/reorder", methods=["POST"])
+@api_login_required
+def api_items_reorder():
+    uid     = session["user_id"]
+    payload = request.get_json()
+    for entry in (payload or []):
+        item = Item.query.get(entry["id"])
+        if item and item.location.user_id == uid:
+            item.sort_order = entry["sort_order"]
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# ── Recipe API (Gemini) ────────────────────────────────────────────────────────
+
+@app.route("/api/recipe", methods=["GET"])
+@api_login_required
+def api_recipe():
+    uid       = session["user_id"]
+    locations = Location.query.filter_by(user_id=uid).all()
+    all_items = [i for loc in locations for i in loc.items]
+    if not all_items:
+        return jsonify({"error": "請先新增食物再產生食譜建議"}), 400
+    try:
+        from gemini_nlp import suggest_recipe
+        recipe = suggest_recipe(all_items)
+        return jsonify({"recipe": recipe})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Parse API ─────────────────────────────────────────────────────────────────
 
 @app.route("/api/parse", methods=["POST"])
@@ -382,8 +418,10 @@ def api_items_batch():
             return jsonify({"error": "無效地點"}), 403
     created = []
     for data in items_data:
+        loc_id = data["location_id"]
+        max_order = db.session.query(db.func.max(Item.sort_order)).filter_by(location_id=loc_id).scalar() or 0
         item = Item(
-            location_id   = data["location_id"],
+            location_id   = loc_id,
             name          = data["name"],
             emoji         = data.get("emoji", "🍱"),
             quantity      = float(data.get("quantity", 1)),
@@ -391,6 +429,7 @@ def api_items_batch():
             purchase_date = date.fromisoformat(data["purchase_date"]) if data.get("purchase_date") else None,
             expiry_date   = date.fromisoformat(data["expiry_date"])   if data.get("expiry_date")   else None,
             notes         = data.get("notes", ""),
+            sort_order    = max_order + len(created) + 1,
         )
         db.session.add(item)
         created.append(item)
@@ -406,6 +445,7 @@ def api_add_item():
     loc  = Location.query.get(data.get("location_id"))
     if not loc or loc.user_id != uid:
         return jsonify({"error": "無效地點"}), 403
+    max_order = db.session.query(db.func.max(Item.sort_order)).filter_by(location_id=loc.id).scalar() or 0
     item = Item(
         location_id   = data["location_id"],
         name          = data["name"],
@@ -415,6 +455,7 @@ def api_add_item():
         purchase_date = date.fromisoformat(data["purchase_date"]) if data.get("purchase_date") else None,
         expiry_date   = date.fromisoformat(data["expiry_date"])   if data.get("expiry_date")   else None,
         notes         = data.get("notes", ""),
+        sort_order    = max_order + 1,
     )
     db.session.add(item)
     db.session.commit()
@@ -503,6 +544,17 @@ with app.app_context():
         if "nickname" not in user_cols:
             with db.engine.connect() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN nickname VARCHAR(50)"))
+                conn.commit()
+    except Exception:
+        pass
+
+    # items.sort_order
+    try:
+        item_cols2 = [c["name"] for c in sqla_inspect(db.engine).get_columns("items")]
+        if "sort_order" not in item_cols2:
+            with db.engine.connect() as conn:
+                conn.execute(text("ALTER TABLE items ADD COLUMN sort_order INTEGER DEFAULT 0"))
+                conn.execute(text("UPDATE items SET sort_order = id"))
                 conn.commit()
     except Exception:
         pass

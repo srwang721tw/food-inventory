@@ -1,5 +1,5 @@
 """
-Gemini-based food text parser.
+Gemini-based food text parser and recipe suggester.
 Uses google-genai SDK. Activated when NLP_BACKEND=gemini in environment.
 Output format is identical to parse_multiple_foods() in nlp.py.
 """
@@ -22,7 +22,7 @@ def _build_system_prompt() -> str:
   quantity      : number   數量（浮點數，預設 1.0）
   unit          : string   單位（個/包/顆/瓶/公克/公斤/條/片/根/隻…，預設「個」）
   purchase_date : string|null  購買日期 YYYY-MM-DD；出現購買動詞（買、採購、入手、買了、買回來）且無明確日期→今天；否則 null
-  expiry_date   : string|null  到期/保存期限日期 YYYY-MM-DD；相對日期（三天後/一禮拜/下週/一個月後）請從今天 {today} 計算成絕對日期；「沒有期限/無期限/永久」→ null
+  expiry_date   : string|null  到期/保存期限日期 YYYY-MM-DD；相對日期（三天後/一禮拜/下週/一個月後）請從今天 {today} 計算成絕對日期；若使用者未提及到期日，請依食物種類推估合理保存期限（例：鮮奶 7 天、雞蛋 21 天、豬肉 3 天、雞肉 3 天、魚 2 天、冷凍肉類 90 天、蔬菜 5 天、水果 7 天、罐頭 365 天、泡麵 180 天、豆腐 5 天、起司 30 天）並生成建議日期；僅「無期限/永久/沒有到期日/長期保存」才回傳 null
   location_hint : string|null  存放地點，只能是「冰箱」「冷凍庫」「乾貨櫃」之一；未提及→ null
 
 解析規則：
@@ -52,15 +52,18 @@ def _validate_items(items: list) -> list:
     return result
 
 
+def _client() -> genai.Client:
+    return genai.Client(api_key=os.environ.get('GEMINI_API_KEY', ''))
+
+
+def _model_name() -> str:
+    return os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+
+
 def parse_with_gemini(text: str) -> list[dict]:
     """Parse food text using Gemini Flash. Returns same format as parse_multiple_foods()."""
-    api_key    = os.environ.get('GEMINI_API_KEY', '')
-    model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
-
-    client = genai.Client(api_key=api_key)
-
-    response = client.models.generate_content(
-        model=model_name,
+    response = _client().models.generate_content(
+        model=_model_name(),
         contents=text,
         config=types.GenerateContentConfig(
             system_instruction=_build_system_prompt(),
@@ -89,3 +92,21 @@ def parse_with_gemini(text: str) -> list[dict]:
         raise ValueError('Gemini 未解析出任何食物')
 
     return validated
+
+
+def suggest_recipe(items: list) -> str:
+    """Given a list of Item ORM objects, ask Gemini to suggest one recipe."""
+    inventory = '\n'.join(
+        f'- {i.name} × {i.quantity}{i.unit}' for i in items
+    )
+    prompt = (
+        f'我的食材庫存：\n{inventory}\n\n'
+        '請根據以上食材推薦一道可以製作的料理，'
+        '給出菜名和簡要步驟（3-5個步驟）。請用繁體中文回覆。'
+    )
+    response = _client().models.generate_content(
+        model=_model_name(),
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.7),
+    )
+    return (response.text or '').strip()

@@ -250,11 +250,32 @@
       color: var(--text); background: var(--bg); outline: none;
       transition: border-color 0.14s, background 0.2s, color 0.2s;
     }
+    .fg input, .fg select { height: 44px; box-sizing: border-box; }
     /* iOS Safari: -webkit-appearance:none forces CSS-controlled sizing; date picker still works */
     .fg input[type="date"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
     .fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--primary); }
     .fg textarea { resize: none; min-height: 62px; line-height: 1.5; }
     .fg input::placeholder, .fg textarea::placeholder { color: var(--text3); }
+    /* Password show/hide wrapper */
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 42px; width: 100%; box-sizing: border-box; }
+    .pw-eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 15px;
+      color: var(--text3); padding: 4px; line-height: 1; }
+    /* Item drag handle */
+    .item-drag-handle {
+      font-size: 16px; color: var(--text3); cursor: grab; padding: 0 6px 0 2px;
+      align-self: stretch; display: flex; align-items: center;
+      flex-shrink: 0; touch-action: none; user-select: none;
+    }
+    .item-drag-handle:active { cursor: grabbing; }
+    .swipe-wrap.item-dragging { opacity: 0.3; }
+    /* Recipe suggestion card */
+    .recipe-card { background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--border); padding: 14px 16px; }
+    .recipe-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .recipe-btn { width: 100%; padding: 10px; border: none; border-radius: var(--rsm); background: var(--primary); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+    .recipe-btn:disabled { opacity: .55; cursor: default; }
+    .recipe-content { font-size: 13px; color: var(--text2); line-height: 1.7; margin-top: 12px; white-space: pre-wrap; }
     .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .btn-row { display: flex; gap: 10px; margin-top: 16px; }
     .btn { flex: 1; padding: 13px; border: none; border-radius: var(--rsm); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.12s; }
@@ -341,7 +362,7 @@
 <!-- Header -->
 <div class="header">
   <div class="header-top">
-    <h1>{{ current_nickname or '我的' }}<span> PantryAI</span></h1>
+    <h1>{{ (current_nickname + '的') if current_nickname else '我的' }}<span> PantryAI</span></h1>
     <div style="display:flex;align-items:center;gap:6px">
       <button class="theme-btn" onclick="openUsersSheet()" title="使用者管理">👥</button>
       <button class="theme-btn" onclick="confirmLogout()" title="登出 {{ current_username }}">🚪</button>
@@ -459,8 +480,9 @@
 
     <!-- 修改密碼（所有使用者） -->
     <div class="slabel">修改密碼</div>
-    <div class="fg"><label>目前密碼</label><input type="password" id="curPassword" placeholder="輸入目前密碼" autocomplete="current-password"></div>
-    <div class="fg"><label>新密碼</label><input type="password" id="newPasswordMe" placeholder="輸入新密碼（至少 4 字元）" autocomplete="new-password"></div>
+    <div class="fg"><label>目前密碼</label><div class="pw-wrap"><input type="password" id="curPassword" placeholder="輸入目前密碼" autocomplete="current-password"><button class="pw-eye" type="button" onclick="togglePw('curPassword',this)">👁</button></div></div>
+    <div class="fg"><label>新密碼</label><div class="pw-wrap"><input type="password" id="newPasswordMe" placeholder="輸入新密碼（至少 4 字元）" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('newPasswordMe',this)">👁</button></div></div>
+    <div class="fg"><label>確認新密碼</label><div class="pw-wrap"><input type="password" id="confirmPasswordMe" placeholder="再次輸入新密碼" autocomplete="new-password"><button class="pw-eye" type="button" onclick="togglePw('confirmPasswordMe',this)">👁</button></div></div>
     <button class="parse-btn" onclick="changePassword()" style="margin-bottom:20px">儲存新密碼</button>
 
     {% if is_admin %}
@@ -471,7 +493,8 @@
     <!-- 新增帳號（管理員） -->
     <div class="slabel">新增帳號</div>
     <div class="fg"><label>帳號</label><input type="text" id="newUsername" placeholder="帳號名稱" autocapitalize="none" spellcheck="false"></div>
-    <div class="fg"><label>密碼</label><input type="password" id="newPassword" placeholder="設定密碼"></div>
+    <div class="fg"><label>密碼</label><div class="pw-wrap"><input type="password" id="newPassword" placeholder="設定密碼"><button class="pw-eye" type="button" onclick="togglePw('newPassword',this)">👁</button></div></div>
+    <div class="fg"><label>確認密碼</label><div class="pw-wrap"><input type="password" id="confirmPassword" placeholder="再次輸入密碼"><button class="pw-eye" type="button" onclick="togglePw('confirmPassword',this)">👁</button></div></div>
     <button class="parse-btn" onclick="addUser()" style="margin-bottom:20px">新增帳號</button>
     {% endif %}
 
@@ -502,6 +525,10 @@ applyTheme(currentTheme);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (currentTheme === 'system') applyTheme('system');
 });
+
+// ── App-level constants (server-rendered) ─────────────────────
+const IS_ADMIN  = {{ is_admin  | tojson }};
+const IS_GEMINI = {{ is_gemini | tojson }};
 
 // ── Data ──────────────────────────────────────────────────────
 let DATA = {{ data_json|safe }};
@@ -594,7 +621,9 @@ function badgeText(item) {
   if (d < 0)  return `過期${Math.abs(d)}天`;
   if (d === 0) return '今天到期！';
   if (d === 1) return '明天到期';
-  return `還剩${d}天`;
+  if (d <= 30) return `還剩${d}天`;
+  const e = new Date(item.expiry_date);
+  return `${e.getFullYear()}年${e.getMonth()+1}月${e.getDate()}日到期`;
 }
 function fmtDate(s) {
   if (!s) return '';
@@ -656,23 +685,40 @@ function filterByStatus(type) {
   });
 }
 
+const RECIPE_BLOCK = IS_GEMINI ? `
+  <div class="recipe-card" id="recipeCard">
+    <h3>✨ AI 食譜建議</h3>
+    <button class="recipe-btn" id="recipeBtn" onclick="generateRecipe()">🍳 產生食譜建議</button>
+    <div class="recipe-content" id="recipeContent" style="display:none"></div>
+  </div>` : '';
+
 function renderLocs() {
   const el = document.getElementById('locsList');
   if (!DATA.locations.length) {
     el.innerHTML = `<div class="empty"><div class="ei">🏠</div><p>還沒有存放地點</p></div>` +
-      `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
+      `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>` +
+      RECIPE_BLOCK;
     return;
   }
   el.innerHTML = DATA.locations.map(locHTML).join('') +
-    `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>`;
+    `<button class="add-loc-btn" onclick="openAddLoc()">＋ 新增存放地點</button>` +
+    RECIPE_BLOCK;
 
-  // Bind drag handles (touch + mouse) after render
+  // Bind location drag handles (touch + mouse) after render
   DATA.locations.forEach(loc => {
     const handle = document.querySelector(`#la-${loc.id} .drag-handle`);
     if (handle) {
       handle.addEventListener('touchstart', e => onDragHandleTouch(e, loc.id), { passive: false });
       handle.addEventListener('mousedown',  e => onDragHandleMouse(e, loc.id));
     }
+  });
+
+  // Bind item drag handles
+  document.querySelectorAll('.item-drag-handle').forEach(handle => {
+    const wrapEl = handle.closest('.swipe-wrap');
+    const itemId = parseInt(wrapEl.id.replace('sw-', ''));
+    handle.addEventListener('touchstart', e => onItemDragHandleTouch(e, itemId, wrapEl), { passive: false });
+    handle.addEventListener('mousedown',  e => onItemDragHandleMouse(e, itemId, wrapEl));
   });
 
   // Bind swipe on item cards
@@ -720,6 +766,7 @@ function itemHTML(item) {
   return `
   <div class="swipe-wrap" id="sw-${item.id}">
     <div class="item-card s${st}" id="ic-${item.id}">
+      <div class="item-drag-handle" onclick="event.stopPropagation()">≡</div>
       <div class="item-emoji" onclick="openEditItem(${item.id})">${item.emoji||'🍱'}</div>
       <div class="item-info" onclick="openEditItem(${item.id})">
         <div class="item-name">${item.name}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span></div>
@@ -749,6 +796,7 @@ function initSwipe(wrap, card, itemId) {
 
   card.addEventListener('touchstart', e => {
     if (e.touches.length !== 1) return;
+    if (e.target.closest('.item-drag-handle')) return; // drag handle 接管，不啟動 swipe
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
     dx = 0; moved = false;
@@ -876,6 +924,80 @@ function onDragHandleMouse(e, locId) {
 }
 function onDragMoveMouse(e) { _dragMove(e.clientY); }
 function onDragEndMouse()   { document.removeEventListener('mousemove', onDragMoveMouse); _dragEnd(); }
+
+// ── Item drag-to-reorder ──────────────────────────────────────
+let itemDrag = null;
+
+function _itemDragStart(clientY, itemId, wrapEl) {
+  const rect  = wrapEl.getBoundingClientRect();
+  const ghost = wrapEl.cloneNode(true);
+  ghost.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;opacity:0.88;pointer-events:none;z-index:999;box-shadow:0 8px 32px rgba(0,0,0,0.22);`;
+  document.body.appendChild(ghost);
+  wrapEl.classList.add('item-dragging');
+  const container = wrapEl.closest('.loc-items');
+  itemDrag = { itemId, wrapEl, ghost, container, offsetY: clientY - rect.top };
+}
+
+function _itemDragMove(clientY) {
+  if (!itemDrag) return;
+  itemDrag.ghost.style.top = `${clientY - itemDrag.offsetY}px`;
+  const siblings = Array.from(itemDrag.container.querySelectorAll('.swipe-wrap:not(.item-dragging)'));
+  let inserted = false;
+  for (const el of siblings) {
+    const r = el.getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) {
+      itemDrag.container.insertBefore(itemDrag.wrapEl, el);
+      inserted = true; break;
+    }
+  }
+  if (!inserted) itemDrag.container.appendChild(itemDrag.wrapEl);
+}
+
+function _itemDragEnd() {
+  if (!itemDrag) return;
+  itemDrag.ghost.remove();
+  itemDrag.wrapEl.classList.remove('item-dragging');
+  // Build new order from DOM
+  const newOrder = Array.from(itemDrag.container.querySelectorAll('.swipe-wrap'))
+    .map((el, idx) => ({ id: parseInt(el.id.replace('sw-', '')), sort_order: idx }));
+  // Update DATA in-memory
+  const locId = itemDrag.wrapEl.closest('.loc-acc')
+    ? parseInt(itemDrag.wrapEl.closest('.loc-acc').id.replace('la-', ''))
+    : null;
+  if (locId !== null) {
+    const loc = DATA.locations.find(l => l.id === locId);
+    if (loc) {
+      const orderMap = {};
+      newOrder.forEach(o => orderMap[o.id] = o.sort_order);
+      loc.items.sort((a, b) => (orderMap[a.id] ?? 99) - (orderMap[b.id] ?? 99));
+    }
+  }
+  itemDrag = null;
+  fetch('/api/items/reorder', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newOrder),
+  }).catch(() => toast('排序儲存失敗', 'err'));
+}
+
+function onItemDragHandleTouch(e, itemId, wrapEl) {
+  if (e.touches.length !== 1) return;
+  e.preventDefault(); e.stopPropagation();
+  _itemDragStart(e.touches[0].clientY, itemId, wrapEl);
+  document.addEventListener('touchmove', _onItemDragMove, { passive: false });
+  document.addEventListener('touchend', _onItemDragEnd, { once: true });
+}
+function _onItemDragMove(e) { if (!itemDrag) return; e.preventDefault(); _itemDragMove(e.touches[0].clientY); }
+function _onItemDragEnd()   { document.removeEventListener('touchmove', _onItemDragMove); _itemDragEnd(); }
+
+function onItemDragHandleMouse(e, itemId, wrapEl) {
+  if (e.button !== 0) return;
+  e.preventDefault(); e.stopPropagation();
+  _itemDragStart(e.clientY, itemId, wrapEl);
+  document.addEventListener('mousemove', _onItemDragMoveMouse);
+  document.addEventListener('mouseup', _onItemDragEndMouse, { once: true });
+}
+function _onItemDragMoveMouse(e) { _itemDragMove(e.clientY); }
+function _onItemDragEndMouse()   { document.removeEventListener('mousemove', _onItemDragMoveMouse); _itemDragEnd(); }
 
 // ── Accordion ─────────────────────────────────────────────────
 function toggleLoc(id) {
@@ -1221,14 +1343,24 @@ function confirmLogout() {
 }
 
 // ── User management ───────────────────────────────────────────
-const IS_ADMIN = {{ is_admin | tojson }};
 let CURRENT_NICKNAME = {{ (current_nickname or '')|tojson }};
+
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
 async function openUsersSheet() {
   showSheet('usersSheet');
   document.getElementById('nicknameInput').value = CURRENT_NICKNAME;
   document.getElementById('curPassword').value = '';
   document.getElementById('newPasswordMe').value = '';
-  if (IS_ADMIN) await refreshUsersList();
+  document.getElementById('confirmPasswordMe').value = '';
+  if (IS_ADMIN) {
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    await refreshUsersList();
+  }
 }
 async function saveNickname() {
   const nick = document.getElementById('nicknameInput').value.trim();
@@ -1238,7 +1370,7 @@ async function saveNickname() {
   CURRENT_NICKNAME = nick;
   toast('暱稱已更新');
   const h1 = document.querySelector('.header h1');
-  if (h1) h1.innerHTML = `${nick || '我的'}<span> PantryAI</span>`;
+  if (h1) h1.innerHTML = `${nick ? nick + '的' : '我的'}<span> PantryAI</span>`;
 }
 async function refreshUsersList() {
   const r = await fetch('/api/users');
@@ -1258,12 +1390,15 @@ async function refreshUsersList() {
 async function addUser() {
   const username = document.getElementById('newUsername').value.trim();
   const password = document.getElementById('newPassword').value.trim();
+  const confirm  = document.getElementById('confirmPassword').value.trim();
   if (!username || !password) { toast('帳號和密碼不能為空','err'); return; }
+  if (password !== confirm) { toast('兩次密碼不一致','err'); return; }
   const r = await fetch('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
   const data = await r.json();
   if (!r.ok) { toast(data.error||'新增失敗','err'); return; }
   document.getElementById('newUsername').value = '';
   document.getElementById('newPassword').value = '';
+  document.getElementById('confirmPassword').value = '';
   toast('已新增帳號「'+username+'」');
   await refreshUsersList();
 }
@@ -1274,15 +1409,30 @@ async function deleteUser(id, username) {
   else { const d = await r.json(); toast(d.error||'刪除失敗','err'); }
 }
 async function changePassword() {
-  const cur = document.getElementById('curPassword').value;
-  const nw  = document.getElementById('newPasswordMe').value.trim();
+  const cur     = document.getElementById('curPassword').value;
+  const nw      = document.getElementById('newPasswordMe').value.trim();
+  const confirm = document.getElementById('confirmPasswordMe').value.trim();
   if (!cur || !nw) { toast('請填寫目前密碼和新密碼','err'); return; }
+  if (nw !== confirm) { toast('兩次密碼不一致','err'); return; }
   const r = await fetch('/api/me/password',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({current_password:cur,new_password:nw})});
   const data = await r.json();
   if (!r.ok) { toast(data.error||'修改失敗','err'); return; }
   document.getElementById('curPassword').value = '';
   document.getElementById('newPasswordMe').value = '';
+  document.getElementById('confirmPasswordMe').value = '';
   toast('密碼已更新');
+}
+async function generateRecipe() {
+  const btn = document.getElementById('recipeBtn');
+  const content = document.getElementById('recipeContent');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = '⏳ 產生中…';
+  const r = await fetch('/api/recipe');
+  const data = await r.json();
+  btn.disabled = false; btn.textContent = '🍳 換一道食譜';
+  if (!r.ok) { toast(data.error || '產生失敗', 'err'); return; }
+  content.style.display = 'block';
+  content.textContent = data.recipe;
 }
 
 // ── Boot ──────────────────────────────────────────────────────
