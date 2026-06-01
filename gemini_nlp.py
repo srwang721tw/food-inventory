@@ -5,10 +5,17 @@ Output format is identical to parse_multiple_foods() in nlp.py.
 """
 import json
 import os
+import time
 from datetime import date
 
 from google import genai
 from google.genai import types
+
+
+def _is_transient(err: Exception) -> bool:
+    """Return True for 503 / UNAVAILABLE errors worth retrying."""
+    s = str(err)
+    return '503' in s or 'UNAVAILABLE' in s or 'temporarily' in s.lower()
 
 
 def _build_system_prompt() -> str:
@@ -96,7 +103,9 @@ def parse_with_gemini(text: str) -> list[dict]:
 
 
 def suggest_recipe(items: list) -> str:
-    """Given a list of Item ORM objects, ask Gemini to suggest one recipe."""
+    """Given a list of Item ORM objects, ask Gemini to suggest one recipe.
+    Retries up to 3 times on transient 503 errors (2 s, 4 s backoff).
+    """
     # Cap at 30 items to keep prompt short
     items = items[:30]
     inventory = '\n'.join(
@@ -108,9 +117,19 @@ def suggest_recipe(items: list) -> str:
         '給出菜名和簡要步驟（3-5個步驟）。請用繁體中文回覆。'
     )
     client = _client()  # keep reference — GC-ing the client closes the HTTP transport
-    response = client.models.generate_content(
-        model=_model_name(),
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.7),
-    )
-    return (response.text or '').strip()
+    last_err: Exception | None = None
+    for attempt in range(3):
+        if attempt:
+            time.sleep(2 ** attempt)   # 2 s → 4 s
+        try:
+            response = client.models.generate_content(
+                model=_model_name(),
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.7),
+            )
+            return (response.text or '').strip()
+        except Exception as e:
+            last_err = e
+            if not _is_transient(e):
+                raise   # quota / auth errors — no point retrying
+    raise last_err  # type: ignore[misc]

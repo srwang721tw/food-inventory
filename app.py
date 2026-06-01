@@ -372,11 +372,18 @@ def api_recipe():
     if not all_items:
         return jsonify({"error": "請先新增食物再產生食譜建議"}), 400
     try:
-        from gemini_nlp import suggest_recipe
+        from gemini_nlp import suggest_recipe, _is_transient
         recipe = suggest_recipe(all_items)
         return jsonify({"recipe": recipe})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        err_str = str(e)
+        if _is_transient(e):
+            msg = "Gemini 目前流量過高，請稍後再試 🙏"
+        elif '429' in err_str or 'quota' in err_str.lower():
+            msg = "Gemini 免費配額已用完，請明天再試"
+        else:
+            msg = "食譜產生失敗，請稍後再試"
+        return jsonify({"error": msg}), 500
 
 
 # ── Parse API ─────────────────────────────────────────────────────────────────
