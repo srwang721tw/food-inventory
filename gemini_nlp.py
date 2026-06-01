@@ -5,6 +5,7 @@ Output format is identical to parse_multiple_foods() in nlp.py.
 """
 import json
 import os
+import random
 import time
 from datetime import date
 
@@ -106,13 +107,12 @@ def suggest_recipe(items: list) -> str:
     """Given a list of Item ORM objects, ask Gemini to suggest one recipe.
     Retries up to 3 times on transient 503 errors (2 s, 4 s backoff).
     """
-    # Cap at 30 items to keep prompt short
-    items = items[:30]
-    inventory = '\n'.join(
-        f'- {i.name} × {i.quantity}{i.unit}' for i in items
-    )
+    # Randomly pick 3–5 items so each request gives a different suggestion
+    k = min(len(items), random.randint(3, 5))
+    chosen = random.sample(items, k)
+    ingredients = '、'.join(i.name for i in chosen)
     prompt = (
-        f'我的食材庫存：\n{inventory}\n\n'
+        f'我有這些食材：{ingredients}。\n'
         '請根據以上食材推薦一道可以製作的料理，'
         '給出菜名和簡要步驟（3-5個步驟）。請用繁體中文回覆。'
     )
