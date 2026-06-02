@@ -65,7 +65,7 @@ def _client() -> genai.Client:
 
 
 def _model_name() -> str:
-    return os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    return os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite')
 
 
 def parse_with_gemini(text: str) -> list[dict]:
@@ -113,7 +113,8 @@ def suggest_recipe(items: list) -> str:
     ingredients = '、'.join(i.name for i in chosen)
     prompt = (
         f'我有這些食材：{ingredients}。\n'
-        '請根據以上食材推薦一道料理，給出菜名和簡要步驟。'
+        '請推薦一道簡單的台灣家常料理（炒菜、湯品、蛋料理等日常菜色），'
+        '不要創意料理或複雜技法。給出菜名和簡要步驟。'
         '全文限 150 字以內，請用繁體中文回覆。'
     )
     client = _client()  # keep reference — GC-ing the client closes the HTTP transport
