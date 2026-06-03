@@ -5,7 +5,7 @@ from functools import wraps
 
 from argon2 import PasswordHasher
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect as sqla_inspect, text
 
@@ -222,6 +222,15 @@ def location_view(loc_id):
 @app.route("/health")
 def health():
     return "OK", 200
+
+
+@app.route("/sw.js")
+def service_worker():
+    """Serve Service Worker from root path so its scope covers the whole app."""
+    resp = send_from_directory(app.static_folder, "sw.js")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    return resp
 
 
 # ── Change own nickname (any user) ───────────────────────────────────────────

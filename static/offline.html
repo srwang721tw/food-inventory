@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PantryAI — 離線中</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
+  <style>
+    :root {
+      --bg: #f2f2f7; --card: #ffffff; --primary: #30b0c7;
+      --text: #1c1c1e; --text2: #636366; --text3: #aeaeb2;
+      --shadow: 0 2px 14px rgba(0,0,0,0.07); --radius: 16px; --rsm: 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e; --card: #2c2c2e;
+        --text: #f2f2f7; --text2: rgba(235,235,245,0.6); --text3: rgba(235,235,245,0.3);
+        --shadow: 0 2px 14px rgba(0,0,0,0.4);
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Noto Sans TC', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px;
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 40px 28px 36px;
+      width: min(360px, 100%);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .logo { font-size: 56px; line-height: 1; margin-bottom: 8px; }
+    .app-name { font-size: 20px; font-weight: 700; color: var(--primary); margin-bottom: 20px; }
+    .icon-wrap {
+      font-size: 48px; margin-bottom: 16px;
+    }
+    h2 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+    p { font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 28px; }
+    .btn {
+      display: inline-block; padding: 12px 32px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: var(--rsm);
+      font-size: 15px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:active { opacity: .8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🍱</div>
+    <div class="app-name">PantryAI</div>
+    <div class="icon-wrap">📡</div>
+    <h2>目前無網路連線</h2>
+    <p>請確認網路連線後再試。<br>您的資料已安全儲存在伺服器上。</p>
+    <button class="btn" onclick="location.reload()">重新連線</button>
+  </div>
+</body>
+</html>

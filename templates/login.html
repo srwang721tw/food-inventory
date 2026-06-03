@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PantryAI</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#30b0c7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PantryAI">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     /* ── CSS Variables ── */
@@ -146,6 +152,10 @@
       .logo { font-size: 38px; margin-bottom: 4px; }
       .app-sub { margin-bottom: 16px; }
     }
+    /* PWA standalone: iOS home-indicator safe area */
+    @media (display-mode: standalone) {
+      body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    }
   </style>
 </head>
 <body>
@@ -157,13 +167,9 @@
   <div class="app-name">PantryAI</div>
   <div class="app-sub">您的冰箱守門員</div>
 
-  {% if error %}
-  <div class="err-msg show">{{ error }}</div>
-  {% else %}
-  <div class="err-msg" id="errMsg"></div>
-  {% endif %}
+  <div class="err-msg{% if error %} show{% endif %}" id="errMsg">{% if error %}{{ error }}{% endif %}</div>
 
-  <form method="POST" action="/login">
+  <form id="loginForm">
     <div class="fg">
       <label for="username">帳號</label>
       <input type="text" id="username" name="username" placeholder="請輸入帳號"
@@ -178,7 +184,7 @@
         <button class="pw-eye" type="button" onclick="togglePw('password',this)" aria-label="顯示密碼"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </div>
-    <button class="btn-login" type="submit">登入</button>
+    <button class="btn-login" type="submit" id="loginBtn">登入</button>
   </form>
 </div>
 
@@ -214,6 +220,49 @@ applyTheme(currentTheme);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (currentTheme === 'system') applyTheme('system');
 });
+
+// ── Fetch-based login (keeps iOS standalone WebView in-app) ────────────────
+const errMsg = document.getElementById('errMsg');
+function showErr(msg) {
+  errMsg.textContent = msg;
+  errMsg.classList.add('show');
+}
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '登入中…';
+  errMsg.classList.remove('show');
+  try {
+    const params = new URLSearchParams(new FormData(e.target));
+    const r = await fetch('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+      redirect: 'follow',
+    });
+    if (r.redirected || r.url.endsWith('/') || !r.url.includes('/login')) {
+      // Successful login — server redirected away from /login
+      window.location.href = r.url;
+    } else {
+      // Still on login page — parse error from response HTML
+      const html = await r.text();
+      const m = html.match(/class="err-msg show">([^<]+)</);
+      showErr(m ? m[1] : '帳號或密碼錯誤');
+      btn.disabled = false;
+      btn.textContent = '登入';
+    }
+  } catch {
+    showErr('網路連線錯誤，請稍後再試');
+    btn.disabled = false;
+    btn.textContent = '登入';
+  }
+});
+
+// ── Service Worker ─────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

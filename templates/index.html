@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PantryAI</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍱</text></svg>">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <meta name="theme-color" content="#30b0c7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PantryAI">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     /* ── CSS Variables ── */
@@ -63,6 +69,10 @@
     }
     @media (orientation: landscape) {
       body { max-width: min(700px, 100vw); }
+    }
+    /* PWA standalone: respect iOS home-indicator safe area */
+    @media (display-mode: standalone) {
+      body { padding-bottom: env(safe-area-inset-bottom, 0px); }
     }
 
     /* ── Header ── */
@@ -1441,6 +1451,9 @@ async function generateRecipe() {
 // ── Boot ──────────────────────────────────────────────────────
 const voiceBtn = document.getElementById('voiceBtn');
 render();
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 
 <footer style="text-align:center;padding:20px 0 44px;font-size:11px;color:var(--text3)">
