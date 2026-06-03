@@ -247,7 +247,9 @@
       scrollbar-width: none; transition: background 0.2s;
     }
     .sheet::-webkit-scrollbar { display: none; }
-    .handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 13px auto 16px; }
+    .handle { width: 44px; height: 4px; background: var(--border); border-radius: 2px;
+      margin: 0 auto 12px; padding: 14px 30px; box-sizing: content-box;
+      background-clip: content-box; cursor: grab; touch-action: none; user-select: none; }
     .sheet h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
     @keyframes su { from { transform: translateY(100%); } }
 
@@ -1033,6 +1035,54 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.overlay:not(.hidden)').forEach(o => o.classList.add('hidden'));
 });
+
+// ── Sheet swipe-down-to-dismiss (all sheets via .handle) ──────
+(function() {
+  let startY = 0, dragY = 0, dragging = false, dragSheet = null;
+
+  document.addEventListener('touchstart', e => {
+    if (!e.target.closest('.handle')) return;
+    dragSheet = e.target.closest('.sheet');
+    if (!dragSheet) return;
+    startY = e.touches[0].clientY;
+    dragY = 0;
+    dragging = true;
+    dragSheet.style.transition = 'none';
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!dragging || !dragSheet) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) return;           // don't allow dragging upward
+    dragY = dy;
+    dragSheet.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!dragging || !dragSheet) return;
+    dragging = false;
+    const sheet = dragSheet;
+    const overlay = sheet.closest('.overlay');
+    dragSheet = null;
+
+    if (dragY > 80) {
+      // Slide out then hide overlay
+      sheet.style.transition = 'transform 0.28s cubic-bezier(0.32,0.72,0,1)';
+      sheet.style.transform = 'translateY(120%)';
+      setTimeout(() => {
+        if (overlay) overlay.classList.add('hidden');
+        sheet.style.transform = '';
+        sheet.style.transition = '';
+      }, 290);
+    } else {
+      // Snap back
+      sheet.style.transition = 'transform 0.26s cubic-bezier(0.32,0.72,0,1)';
+      sheet.style.transform = '';
+      setTimeout(() => { sheet.style.transition = ''; }, 270);
+    }
+    dragY = 0;
+  });
+})();
 
 // ── Toast ─────────────────────────────────────────────────────
 function toast(msg, type='') {
