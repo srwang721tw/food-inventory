@@ -247,9 +247,8 @@
       scrollbar-width: none; transition: background 0.2s;
     }
     .sheet::-webkit-scrollbar { display: none; }
-    .handle { width: 44px; height: 4px; background: var(--border); border-radius: 2px;
-      margin: 0 auto 12px; padding: 14px 30px; box-sizing: content-box;
-      background-clip: content-box; cursor: grab; touch-action: none; user-select: none; }
+    .handle { width: 44px; height: 5px; background: var(--border); border-radius: 3px;
+      margin: 14px auto 14px; }
     .sheet h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
     @keyframes su { from { transform: translateY(100%); } }
 
@@ -1036,49 +1035,68 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.overlay:not(.hidden)').forEach(o => o.classList.add('hidden'));
 });
 
-// ── Sheet swipe-down-to-dismiss (all sheets via .handle) ──────
+// ── Sheet swipe-down-to-dismiss ───────────────────────────────
+// Activates on the whole sheet area when scrollTop === 0 and swiping down.
+// Uses non-passive touchmove so we can preventDefault to block scroll during drag.
 (function() {
-  let startY = 0, dragY = 0, dragging = false, dragSheet = null;
+  let startY = 0, dragY = 0, active = false, candidate = null, sheet = null;
 
   document.addEventListener('touchstart', e => {
-    if (!e.target.closest('.handle')) return;
-    dragSheet = e.target.closest('.sheet');
-    if (!dragSheet) return;
+    const s = e.target.closest('.sheet');
+    if (!s) return;
+    const overlay = s.closest('.overlay');
+    if (!overlay || overlay.classList.contains('hidden')) return;
+    candidate = s;
     startY = e.touches[0].clientY;
     dragY = 0;
-    dragging = true;
-    dragSheet.style.transition = 'none';
+    active = false;
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
-    if (!dragging || !dragSheet) return;
+    if (!candidate) return;
     const dy = e.touches[0].clientY - startY;
-    if (dy <= 0) return;           // don't allow dragging upward
-    dragY = dy;
-    dragSheet.style.transform = `translateY(${dy}px)`;
-  }, { passive: true });
+
+    if (!active) {
+      // Decide: dismiss gesture or normal scroll
+      if (dy > 10 && candidate.scrollTop === 0) {
+        // Start dismiss gesture
+        active = true;
+        sheet = candidate;
+        sheet.style.transition = 'none';
+      } else if (dy < -5 || candidate.scrollTop > 0) {
+        // Normal scroll — hands off
+        candidate = null;
+        return;
+      } else {
+        return; // wait for clear direction
+      }
+    }
+
+    dragY = Math.max(0, dy);
+    sheet.style.transform = `translateY(${dragY}px)`;
+    e.preventDefault(); // prevent scroll while dragging sheet down
+  }, { passive: false });
 
   document.addEventListener('touchend', () => {
-    if (!dragging || !dragSheet) return;
-    dragging = false;
-    const sheet = dragSheet;
-    const overlay = sheet.closest('.overlay');
-    dragSheet = null;
+    candidate = null;
+    if (!active || !sheet) { active = false; return; }
+    active = false;
+    const s = sheet;
+    const overlay = s.closest('.overlay');
+    sheet = null;
 
-    if (dragY > 80) {
-      // Slide out then hide overlay
-      sheet.style.transition = 'transform 0.28s cubic-bezier(0.32,0.72,0,1)';
-      sheet.style.transform = 'translateY(120%)';
+    if (dragY > 100) {
+      s.style.transition = 'transform 0.28s cubic-bezier(0.32,0.72,0,1)';
+      s.style.transform = 'translateY(120%)';
       setTimeout(() => {
         if (overlay) overlay.classList.add('hidden');
-        sheet.style.transform = '';
-        sheet.style.transition = '';
+        s.style.transform = '';
+        s.style.transition = '';
       }, 290);
     } else {
-      // Snap back
-      sheet.style.transition = 'transform 0.26s cubic-bezier(0.32,0.72,0,1)';
-      sheet.style.transform = '';
-      setTimeout(() => { sheet.style.transition = ''; }, 270);
+      s.style.transition = 'transform 0.26s cubic-bezier(0.32,0.72,0,1)';
+      s.style.transform = '';
+      setTimeout(() => { s.style.transition = ''; }, 270);
     }
     dragY = 0;
   });
