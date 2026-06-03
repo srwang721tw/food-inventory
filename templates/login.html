@@ -245,10 +245,11 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
       // Successful login — server redirected away from /login
       window.location.href = r.url;
     } else {
-      // Still on login page — parse error from response HTML
+      // Still on login page — parse error via DOMParser (avoids self-matching regex)
       const html = await r.text();
-      const m = html.match(/class="err-msg show">([^<]+)</);
-      showErr(m ? m[1] : '帳號或密碼錯誤');
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const errEl = doc.getElementById('errMsg');
+      showErr((errEl && errEl.textContent.trim()) || '帳號或密碼錯誤');
       btn.disabled = false;
       btn.textContent = '登入';
     }
