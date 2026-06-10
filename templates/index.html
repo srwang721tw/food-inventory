@@ -285,6 +285,12 @@
     /* Recipe suggestion card */
     .recipe-card { background: var(--card); border-radius: var(--radius); border: 1.5px solid var(--border); padding: 14px 16px; }
     .recipe-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .recipe-ing { margin-bottom: 10px; }
+    .recipe-ing input { width: 100%; padding: 10px 12px; border-radius: var(--rsm); border: 1.5px solid var(--border); font-size: 14px; font-family: inherit; color: var(--text); background: var(--bg); outline: none; box-sizing: border-box; transition: border-color 0.14s, background 0.2s, color 0.2s; }
+    .recipe-ing input:focus { border-color: var(--primary); }
+    .recipe-ing input::placeholder { color: var(--text3); }
+    .recipe-combine { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); margin-bottom: 10px; cursor: pointer; user-select: none; }
+    .recipe-combine input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
     .recipe-btn { width: 100%; padding: 10px; border: none; border-radius: var(--rsm); background: var(--primary); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s; }
     .recipe-btn:disabled { opacity: .55; cursor: default; }
     .recipe-content { font-size: 13px; color: var(--text2); line-height: 1.7; margin-top: 12px; white-space: pre-wrap; }
@@ -700,6 +706,13 @@ function filterByStatus(type) {
 const RECIPE_BLOCK = IS_GEMINI ? `
   <div class="recipe-card" id="recipeCard">
     <h3>✨ AI 食譜建議</h3>
+    <div class="recipe-ing">
+      <input type="text" id="recipeIngInput" placeholder="輸入想用的食材（可留空）">
+    </div>
+    <label class="recipe-combine">
+      <input type="checkbox" id="recipeCombine" checked>
+      <span>結合現有庫存食材</span>
+    </label>
     <button class="recipe-btn" id="recipeBtn" onclick="generateRecipe()">🍳 產生食譜建議</button>
     <div class="recipe-content" id="recipeContent" style="display:none"></div>
   </div>` : '';
@@ -1507,8 +1520,14 @@ async function generateRecipe() {
   const btn = document.getElementById('recipeBtn');
   const content = document.getElementById('recipeContent');
   if (!btn) return;
+  const ingredients = (document.getElementById('recipeIngInput')?.value || '').trim();
+  const combine     = document.getElementById('recipeCombine')?.checked ?? true;
   btn.disabled = true; btn.textContent = '⏳ 產生中…';
-  const r = await fetch('/api/recipe');
+  const r = await fetch('/api/recipe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ingredients, combine }),
+  });
   const data = await r.json();
   btn.disabled = false; btn.textContent = '🍳 換一道食譜';
   if (!r.ok) { toast(data.error || '產生失敗', 'err'); return; }
@@ -1525,7 +1544,7 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <footer style="text-align:center;padding:20px 0 44px;font-size:11px;color:var(--text3)">
-  © 2025 <a href="https://github.com/srwang721tw" target="_blank" style="color:var(--text3);text-decoration:none">srwang721tw</a>
+  © 2026 <a href="https://github.com/srwang721tw" target="_blank" style="color:var(--text3);text-decoration:none">srwang721tw</a>
 </footer>
 </body>
 </html>

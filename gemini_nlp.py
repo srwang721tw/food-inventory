@@ -103,18 +103,34 @@ def parse_with_gemini(text: str) -> list[dict]:
     return validated
 
 
-def suggest_recipe(items: list) -> str:
-    """Given a list of Item ORM objects, ask Gemini to suggest one recipe.
+def suggest_recipe(inventory_items: list,
+                   user_ingredients: str = '',
+                   combine: bool = True) -> str:
+    """Given inventory items + optional user input, ask Gemini to suggest a recipe.
     Retries up to 3 times on transient 503 errors (2 s, 4 s backoff).
+
+    Three-branch ingredient logic:
+    - user_ingredients + combine=True + has inventory → user input + random 2–3 from inventory
+    - user_ingredients + combine=False             → user input only
+    - no user_ingredients                          → random 3–5 from inventory
     """
-    # Randomly pick 3–5 items so each request gives a different suggestion
-    k = min(len(items), random.randint(3, 5))
-    chosen = random.sample(items, k)
-    ingredients = '、'.join(i.name for i in chosen)
+    if user_ingredients and combine and inventory_items:
+        k = min(len(inventory_items), random.randint(2, 3))
+        chosen = random.sample(inventory_items, k)
+        inv_str = '、'.join(i.name for i in chosen)
+        ingredients_str = f'{user_ingredients}、{inv_str}'
+    elif user_ingredients:
+        ingredients_str = user_ingredients
+    else:
+        k = min(len(inventory_items), random.randint(3, 5))
+        chosen = random.sample(inventory_items, k)
+        ingredients_str = '、'.join(i.name for i in chosen)
+
     prompt = (
-        f'我有這些食材：{ingredients}。\n'
-        '請推薦一道簡單的台灣家常料理（炒菜、湯品、蛋料理等日常菜色），'
+        f'我有這些食材：{ingredients_str}。\n'
+        '請推薦一道用其中部分食材的簡單台灣家常料理（炒菜、湯品、蛋料理等日常菜色），'
         '不要創意料理或複雜技法。給出菜名和簡要步驟。'
+        '食譜文字中只提到實際使用到的食材，不提沒有用到的食材。'
         '全文限 150 字以內，請用繁體中文回覆。'
     )
     client = _client()  # keep reference — GC-ing the client closes the HTTP transport

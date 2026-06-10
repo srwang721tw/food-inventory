@@ -372,17 +372,22 @@ def api_items_reorder():
 
 # ── Recipe API (Gemini) ────────────────────────────────────────────────────────
 
-@app.route("/api/recipe", methods=["GET"])
+@app.route("/api/recipe", methods=["POST"])
 @api_login_required
 def api_recipe():
-    uid       = session["user_id"]
+    uid              = session["user_id"]
+    body             = request.get_json() or {}
+    user_ingredients = (body.get("ingredients") or "").strip()
+    combine          = bool(body.get("combine", True))
+
     locations = Location.query.filter_by(user_id=uid).all()
     all_items = [i for loc in locations for i in loc.items]
-    if not all_items:
-        return jsonify({"error": "請先新增食物再產生食譜建議"}), 400
+
+    if not user_ingredients and not all_items:
+        return jsonify({"error": "請先新增食物或輸入食材再產生食譜建議"}), 400
     try:
         from gemini_nlp import suggest_recipe, _is_transient
-        recipe = suggest_recipe(all_items)
+        recipe = suggest_recipe(all_items, user_ingredients, combine)
         return jsonify({"recipe": recipe})
     except Exception as e:
         err_str = str(e)
