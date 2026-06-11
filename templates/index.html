@@ -549,7 +549,7 @@ const IS_ADMIN  = {{ is_admin  | tojson }};
 const IS_GEMINI = {{ is_gemini | tojson }};
 
 // ── Data ──────────────────────────────────────────────────────
-let DATA = {{ data_json|safe }};
+let DATA = {{ data|tojson }};
 DATA.locations.forEach(l => { l._open = false; });
 
 let targetLocId  = null;
@@ -794,7 +794,7 @@ function itemHTML(item) {
       <div class="item-drag-handle" onclick="event.stopPropagation()">≡</div>
       <div class="item-emoji" onclick="openEditItem(${item.id})">${item.emoji||'🍱'}</div>
       <div class="item-info" onclick="openEditItem(${item.id})">
-        <div class="item-name">${item.name}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${item.unit}</span></div>
+        <div class="item-name">${escHtml(item.name)}<span style="font-size:11px;color:var(--text3);font-weight:400"> ×${qty}${escHtml(item.unit||'個')}</span></div>
         <div class="item-meta">${item.purchase_date?'購買 '+fmtDate(item.purchase_date):''}</div>
       </div>
       ${badge}
@@ -1464,7 +1464,7 @@ async function saveNickname() {
   CURRENT_NICKNAME = nick;
   toast('暱稱已更新');
   const h1 = document.querySelector('.header h1');
-  if (h1) h1.innerHTML = `${nick ? nick + '的' : '我的'}<span> PantryAI</span>`;
+  if (h1) h1.innerHTML = `${escHtml(nick ? nick + '的' : '我的')}<span> PantryAI</span>`;
 }
 async function refreshUsersList() {
   const r = await fetch('/api/users');
@@ -1475,10 +1475,10 @@ async function refreshUsersList() {
     : users.map(u => `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
         <div>
-          <span style="font-size:14px;font-weight:600">${u.username}</span>
+          <span style="font-size:14px;font-weight:600">${escHtml(u.username)}</span>
           ${u.is_admin ? '<span style="font-size:11px;color:var(--primary);margin-left:6px">管理員</span>' : ''}
         </div>
-        ${u.is_admin ? '' : `<button onclick="deleteUser(${u.id},'${u.username}')" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;padding:4px 6px">🗑</button>`}
+        ${u.is_admin ? '' : `<button data-uid="${u.id}" data-uname="${escHtml(u.username)}" onclick="deleteUser(this)" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;padding:4px 6px">🗑</button>`}
       </div>`).join('');
 }
 async function addUser() {
@@ -1496,7 +1496,8 @@ async function addUser() {
   toast('已新增帳號「'+username+'」');
   await refreshUsersList();
 }
-async function deleteUser(id, username) {
+async function deleteUser(btn) {
+  const id = btn.dataset.uid, username = btn.dataset.uname;
   if (!confirm(`確定刪除帳號「${username}」？\n\n此帳號下的所有存放地點和食物資料都會一併刪除，無法恢復。`)) return;
   const r = await fetch(`/api/users/${id}`,{method:'DELETE'});
   if (r.ok) { toast('已刪除帳號「'+username+'」及其所有資料'); await refreshUsersList(); }

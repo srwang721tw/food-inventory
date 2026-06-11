@@ -1,15 +1,20 @@
-import json
 import os
 from datetime import date, datetime
 from functools import wraps
 
 from argon2 import PasswordHasher
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect as sqla_inspect, text
 
-from nlp import parse_food_text, parse_multiple_foods
+from nlp import parse_multiple_foods
+
+try:
+    from gemini_nlp import suggest_recipe, parse_with_gemini, _is_transient as _gemini_transient
+    _GEMINI_AVAILABLE = True
+except ImportError:
+    _GEMINI_AVAILABLE = False
 
 load_dotenv()
 
@@ -19,10 +24,14 @@ db_url = os.environ.get("DATABASE_URL", "sqlite:///food_inventory.db")
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
+_is_prod = bool(os.environ.get("DATABASE_URL"))
 app.config.update(
     SQLALCHEMY_DATABASE_URI=db_url,
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     SECRET_KEY=os.environ.get("SECRET_KEY", "dev-key-please-change"),
+    SESSION_COOKIE_SECURE=_is_prod,   # HTTPS-only in production
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_HTTPONLY=True,
 )
 db = SQLAlchemy(app)
 
@@ -60,11 +69,20 @@ def api_login_required(f):
     return deco
 
 
+def admin_required(f):
+    @wraps(f)
+    def deco(*args, **kwargs):
+        me = User.query.get(session.get("user_id"))
+        if not me or not me.is_admin:
+            return jsonify({"error": "權限不足"}), 403
+        return f(*args, **kwargs)
+    return deco
+
+
 # ── Ownership helpers ─────────────────────────────────────────────────────────
 
 def _own_location(loc_id: int):
     """Return Location if it belongs to current user, else abort 403."""
-    from flask import abort
     loc = Location.query.get_or_404(loc_id)
     if loc.user_id != session["user_id"]:
         abort(403)
@@ -73,11 +91,41 @@ def _own_location(loc_id: int):
 
 def _own_item(item_id: int):
     """Return Item if its location belongs to current user, else abort 403."""
-    from flask import abort
     item = Item.query.get_or_404(item_id)
     if item.location.user_id != session["user_id"]:
         abort(403)
     return item
+
+
+def _get_location_or_403(loc_id, uid):
+    """Return (loc, None) or (None, error_response) for item endpoint location checks."""
+    loc = Location.query.get(loc_id)
+    if not loc or loc.user_id != uid:
+        return None, (jsonify({"error": "無效地點"}), 403)
+    return loc, None
+
+
+def _next_item_sort_order(location_id: int) -> int:
+    return (db.session.query(db.func.max(Item.sort_order))
+            .filter_by(location_id=location_id).scalar() or 0) + 1
+
+
+def _parse_date(val):
+    return date.fromisoformat(val) if val else None
+
+
+def _item_from_dict(data: dict, location_id: int, sort_order: int) -> 'Item':
+    return Item(
+        location_id   = location_id,
+        name          = data["name"],
+        emoji         = data.get("emoji", "🍱"),
+        quantity      = float(data.get("quantity", 1)),
+        unit          = data.get("unit", "個"),
+        purchase_date = _parse_date(data.get("purchase_date")),
+        expiry_date   = _parse_date(data.get("expiry_date")),
+        notes         = data.get("notes", ""),
+        sort_order    = sort_order,
+    )
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -189,34 +237,13 @@ def index():
     )
     return render_template(
         "index.html",
-        data_json=json.dumps(data, ensure_ascii=False),
+        data=data,
         current_username=current_user.username if current_user else "",
         current_nickname=current_user.nickname if current_user else None,
         is_admin=current_user.is_admin if current_user else False,
         is_gemini=is_gemini,
     )
 
-
-@app.route("/location/<int:loc_id>")
-@login_required
-def location_view(loc_id):
-    loc   = _own_location(loc_id)
-    items = Item.query.filter_by(location_id=loc_id).order_by(Item.created_at.desc()).all()
-    items = sorted(items, key=lambda i: (
-        i.expiry_date is None,
-        i.expiry_date or date.max,
-        i.name,
-    ))
-    uid            = session["user_id"]
-    all_locations  = Location.query.filter_by(user_id=uid).order_by(Location.name).all()
-    items_json     = json.dumps([i.to_dict() for i in items],         ensure_ascii=False)
-    locations_json = json.dumps([l.to_dict() for l in all_locations], ensure_ascii=False)
-    return render_template(
-        "location.html",
-        location=loc,
-        items_json=items_json,
-        locations_json=locations_json,
-    )
 
 
 @app.route("/health")
@@ -270,10 +297,8 @@ def api_change_password():
 
 @app.route("/api/users", methods=["GET", "POST"])
 @api_login_required
+@admin_required
 def api_users():
-    me = User.query.get(session["user_id"])
-    if not me or not me.is_admin:
-        return jsonify({"error": "權限不足"}), 403
     if request.method == "POST":
         data     = request.get_json() or {}
         username = data.get("username", "").strip()
@@ -298,11 +323,9 @@ def api_users():
 
 @app.route("/api/users/<int:uid>", methods=["DELETE"])
 @api_login_required
+@admin_required
 def api_delete_user(uid):
-    me = User.query.get(session["user_id"])
-    if not me or not me.is_admin:
-        return jsonify({"error": "權限不足"}), 403
-    if uid == me.id:
+    if uid == session["user_id"]:
         return jsonify({"error": "不能刪除自己"}), 400
     user = User.query.get_or_404(uid)
     db.session.delete(user)
@@ -386,12 +409,11 @@ def api_recipe():
     if not user_ingredients and not all_items:
         return jsonify({"error": "請先新增食物或輸入食材再產生食譜建議"}), 400
     try:
-        from gemini_nlp import suggest_recipe, _is_transient
         recipe = suggest_recipe(all_items, user_ingredients, combine)
         return jsonify({"recipe": recipe})
     except Exception as e:
         err_str = str(e)
-        if _is_transient(e):
+        if _gemini_transient(e):
             msg = "Gemini 目前流量過高，請稍後再試 🙏"
         elif '429' in err_str or 'quota' in err_str.lower():
             msg = "Gemini 免費配額已用完，請明天再試"
@@ -410,12 +432,10 @@ def api_parse():
         return jsonify({"error": "請提供文字"}), 400
     backend = os.environ.get("NLP_BACKEND", "regex").lower()
     try:
-        if backend == "gemini" and os.environ.get("GEMINI_API_KEY"):
+        if backend == "gemini" and os.environ.get("GEMINI_API_KEY") and _GEMINI_AVAILABLE:
             try:
-                from gemini_nlp import parse_with_gemini
                 return jsonify(parse_with_gemini(text))
             except Exception:
-                # Gemini failed (429, network error, etc.) — fall back to regex silently
                 return jsonify(parse_multiple_foods(text))
         else:
             return jsonify(parse_multiple_foods(text))
@@ -432,26 +452,13 @@ def api_items_batch():
     items_data = request.get_json()
     if not isinstance(items_data, list):
         return jsonify({"error": "Expected a list"}), 400
-    # Verify all target locations belong to current user
     for data in items_data:
-        loc = Location.query.get(data.get("location_id"))
-        if not loc or loc.user_id != uid:
-            return jsonify({"error": "無效地點"}), 403
+        _, err = _get_location_or_403(data.get("location_id"), uid)
+        if err: return err
     created = []
     for data in items_data:
         loc_id = data["location_id"]
-        max_order = db.session.query(db.func.max(Item.sort_order)).filter_by(location_id=loc_id).scalar() or 0
-        item = Item(
-            location_id   = loc_id,
-            name          = data["name"],
-            emoji         = data.get("emoji", "🍱"),
-            quantity      = float(data.get("quantity", 1)),
-            unit          = data.get("unit", "個"),
-            purchase_date = date.fromisoformat(data["purchase_date"]) if data.get("purchase_date") else None,
-            expiry_date   = date.fromisoformat(data["expiry_date"])   if data.get("expiry_date")   else None,
-            notes         = data.get("notes", ""),
-            sort_order    = max_order + len(created) + 1,
-        )
+        item = _item_from_dict(data, loc_id, _next_item_sort_order(loc_id) + len(created))
         db.session.add(item)
         created.append(item)
     db.session.commit()
@@ -463,21 +470,10 @@ def api_items_batch():
 def api_add_item():
     uid  = session["user_id"]
     data = request.get_json()
-    loc  = Location.query.get(data.get("location_id"))
-    if not loc or loc.user_id != uid:
-        return jsonify({"error": "無效地點"}), 403
-    max_order = db.session.query(db.func.max(Item.sort_order)).filter_by(location_id=loc.id).scalar() or 0
-    item = Item(
-        location_id   = data["location_id"],
-        name          = data["name"],
-        emoji         = data.get("emoji", "🍱"),
-        quantity      = float(data.get("quantity", 1)),
-        unit          = data.get("unit", "個"),
-        purchase_date = date.fromisoformat(data["purchase_date"]) if data.get("purchase_date") else None,
-        expiry_date   = date.fromisoformat(data["expiry_date"])   if data.get("expiry_date")   else None,
-        notes         = data.get("notes", ""),
-        sort_order    = max_order + 1,
-    )
+    loc_id = data.get("location_id")
+    _, err = _get_location_or_403(loc_id, uid)
+    if err: return err
+    item = _item_from_dict(data, loc_id, _next_item_sort_order(loc_id))
     db.session.add(item)
     db.session.commit()
     return jsonify(item.to_dict()), 201
@@ -494,12 +490,9 @@ def api_item(item_id):
         db.session.commit()
         return jsonify({"ok": True})
     data = request.get_json()
-    # If moving to a different location, verify it belongs to current user
     if "location_id" in data:
-        uid = session["user_id"]
-        loc = Location.query.get(data["location_id"])
-        if not loc or loc.user_id != uid:
-            return jsonify({"error": "無效地點"}), 403
+        _, err = _get_location_or_403(data["location_id"], session["user_id"])
+        if err: return err
         item.location_id = int(data["location_id"])
     for field in ("name", "emoji", "unit", "notes"):
         if field in data:
@@ -507,9 +500,9 @@ def api_item(item_id):
     if "quantity" in data:
         item.quantity = float(data["quantity"])
     if "purchase_date" in data:
-        item.purchase_date = date.fromisoformat(data["purchase_date"]) if data["purchase_date"] else None
+        item.purchase_date = _parse_date(data.get("purchase_date"))
     if "expiry_date" in data:
-        item.expiry_date = date.fromisoformat(data["expiry_date"]) if data["expiry_date"] else None
+        item.expiry_date = _parse_date(data.get("expiry_date"))
     item.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify(item.to_dict())
@@ -607,4 +600,4 @@ with app.app_context():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, port=port, host="0.0.0.0")
+    app.run(debug=os.environ.get("FLASK_DEBUG", "0") == "1", port=port, host="0.0.0.0")

@@ -7,6 +7,15 @@
 
 ---
 
+## 設計理念
+
+- **手機優先**：max-width 430px，iOS 風格設計，支援 PWA 安裝到主畫面
+- **零費用**：全部使用免費方案（Render + Neon + Gemini 免費配額），無任何持續費用
+- **離線可用**：Service Worker 快取靜態資源，網路中斷時顯示離線頁面
+- **AI 輔助**：Gemini 解析自然語言，服務不可用時自動 fallback 到本地 regex，從不中斷操作
+
+---
+
 ## Tech Stack
 
 | 層級 | 技術 |
@@ -14,11 +23,12 @@
 | Backend | Python 3.12 · Flask 3.1 |
 | ORM | Flask-SQLAlchemy 3.1 |
 | Database | Neon PostgreSQL（production）· SQLite（local dev）|
-| AI NLP | Google Gemini 2.5 Flash（免費配額）|
+| AI NLP | Google Gemini 3.1 Flash Lite（免費配額）|
 | 本地 NLP | jieba + regex（fallback，零成本）|
 | Auth | Argon2 密碼雜湊（argon2-cffi）· Flask session |
 | Voice | Web Speech API（瀏覽器原生）|
 | Frontend | Vanilla JS + CSS（無框架、無建置步驟）|
+| PWA | Web App Manifest + Service Worker |
 | Hosting | Render free tier + Neon free tier |
 
 ---
@@ -27,15 +37,17 @@
 
 | 功能 | 說明 |
 |------|------|
-| **AI 語意解析** | Gemini 2.5 Flash 解析自然語言，失敗自動 fallback 到本地 regex |
+| **AI 食譜建議** | 根據現有庫存 + 自訂食材，Gemini 推薦簡單台灣家常菜（150 字內）|
+| **AI 語意解析** | Gemini 解析自然語言（名稱、數量、日期、地點），失敗自動 fallback 到本地 regex |
 | **語音輸入** | 持續語音錄音，說完自動解析，支援 iOS Safari 和 Chrome |
 | **批次新增** | 一句話描述多項食物，自動拆分、預覽、可手動修改再加入庫存 |
-| **多使用者隔離** | 每個帳號有獨立的存放地點與食物庫存，資料完全隔離 |
+| **PWA 離線支援** | 可安裝到手機主畫面，Service Worker 快取靜態資源，離線顯示品牌頁面 |
+| **多使用者隔離** | 每個帳號有獨立存放地點與食物庫存，資料完全隔離 |
 | **到期色碼** | 紅（過期或 ≤3 天）· 橘（≤7 天）· 綠（安全）|
 | **左滑刪除** | 手機左滑顯示刪除鍵；電腦 hover 顯示垃圾桶圖示 |
-| **拖拉排序** | 長按 ≡ 拖拉存放地點，touch + mouse 雙模式 |
+| **拖拉排序** | 長按 ≡ 拖拉存放地點與食物，touch + mouse 雙模式 |
+| **下滑收回** | 所有 bottom sheet 可從任意位置向下滑動收回 |
 | **暗色模式** | 系統🌓 / 亮☀️ / 暗🌙 三段切換，偏好存於 localStorage |
-| **個人暱稱** | 使用者可設定暱稱，顯示於 header 標題 |
 | **Zero-cost** | 全部使用免費方案，不產生任何持續費用 |
 
 ---
@@ -67,7 +79,8 @@ PORT=5001 python app.py
 | `ADMIN_PASSWORD` | 初始 admin 帳號密碼 | 是（首次啟動）|
 | `NLP_BACKEND` | `gemini`（建議）或 `regex`（預設）| 否 |
 | `GEMINI_API_KEY` | Google AI Studio API Key | `NLP_BACKEND=gemini` 時必填 |
-| `GEMINI_MODEL` | `gemini-2.5-flash`（預設）或 `gemini-2.5-flash-lite` | 否 |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite`（預設）或其他 Gemini 模型 | 否 |
+| `FLASK_DEBUG` | `1` 啟用 debug mode（僅本地開發）| 否 |
 | `PORT` | 伺服器 port（預設 5000）| 否 |
 
 ---
@@ -113,5 +126,7 @@ PORT=5001 python app.py
 | `/api/items` | POST | 新增食物 |
 | `/api/items/<id>` | GET · PUT · DELETE | 取得 / 更新 / 刪除食物 |
 | `/api/items/batch` | POST | 批次新增食物 |
+| `/api/items/reorder` | POST | 更新食物排序 |
 | `/api/parse` | POST | NLP 解析文字 → item dict 列表 |
+| `/api/recipe` | POST | AI 食譜建議（需 `NLP_BACKEND=gemini`）|
 | `/health` | GET | Render healthcheck |
