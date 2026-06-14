@@ -3,7 +3,7 @@
 > 用語音或自然語言輸入，AI 自動解析食物名稱、數量、到期日，零摩擦管理家庭食材庫存。
 
 **Production：** https://food-inventory-4ygl.onrender.com
-**GitHub：** https://github.com/srwang721tw/food-inventory
+**GitHub：** https://github.com/srwang721tw/pantry-ai
 
 ---
 
