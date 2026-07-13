@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 部署資訊
 
-- **Production：** https://food-inventory-4ygl.onrender.com（Render 免費方案；儘管 `railway.toml` 存在，實際部署在 **Render**，不在 Railway）
+- **Production：** https://pantry-ai-production.up.railway.app（Railway 免費方案；`railway.toml` 已設定）
 - **GitHub：** https://github.com/srwang721tw/pantry-ai
-- 生產環境**必須**設定 `DATABASE_URL` 指向 Neon PostgreSQL。Render 的 filesystem 是 ephemeral，SQLite 資料每次重新部署都會清空。
+- 生產環境**必須**設定 `DATABASE_URL` 指向 Neon PostgreSQL。Railway 的 filesystem 是 ephemeral，SQLite 資料每次重新部署都會清空。
 
 ## 指令
 
@@ -20,7 +20,7 @@ PORT=5001 python app.py
 # 安裝依賴
 pip install -r requirements.txt
 
-# 生產伺服器（Render 使用）
+# 生產伺服器（Railway 使用）
 gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 

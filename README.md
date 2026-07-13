@@ -2,7 +2,7 @@
 
 > 用語音或自然語言輸入，AI 自動解析食物名稱、數量、到期日，零摩擦管理家庭食材庫存。
 
-**Production：** https://food-inventory-4ygl.onrender.com
+**Production：** https://pantry-ai-production.up.railway.app
 **GitHub：** https://github.com/srwang721tw/pantry-ai
 
 ---
@@ -85,12 +85,13 @@ PORT=5001 python app.py
 
 ---
 
-## 部署（Render + Neon）
+## 部署（Railway + Neon）
 
 1. 在 [neon.tech](https://neon.tech) 建立 PostgreSQL 專案（地區：Singapore）
 2. 複製連線字串 `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`
-3. 在 Render Dashboard → Environment 設定上表環境變數
-4. Push 到 GitHub，Render 自動部署
+3. 在 [railway.app](https://railway.app) → New Project → Deploy from GitHub 選擇此 repo
+4. 在 Railway **Variables** tab 設定上表環境變數
+5. Push 到 GitHub，Railway 自動部署（`railway.toml` 已設定好 nixpacks + `/health` healthcheck）
 
 ---
 
