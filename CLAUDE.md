@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 部署資訊
 
-- **Production：** https://pantry-ai-production.up.railway.app（Railway 免費方案；`railway.toml` 已設定）
+- **Production：** https://pantry-ai.up.railway.app（Railway 免費方案；`railway.toml` 已設定）
 - **GitHub：** https://github.com/srwang721tw/pantry-ai
 - 生產環境**必須**設定 `DATABASE_URL` 指向 Neon PostgreSQL。Railway 的 filesystem 是 ephemeral，SQLite 資料每次重新部署都會清空。
 
